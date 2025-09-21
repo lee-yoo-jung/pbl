@@ -259,7 +259,7 @@ class _LoginPageState extends State<LoginPage> {
                       iconSize: 48,
                       onPressed: () => _onSocialLoginPressed('Google'),
                       icon: Image.asset(
-                        'assets/images/google.png',
+                        'assets/images/google.jpg',
                         width: 48,
                         height: 48,
                       ),
@@ -269,7 +269,7 @@ class _LoginPageState extends State<LoginPage> {
                       iconSize: 48,
                       onPressed: () => _onSocialLoginPressed('KakaoTalk'),
                       icon: Image.asset(
-                        'assets/images/kakao.png',
+                        'assets/images/kakao.jpg',
                         width: 48,
                         height: 48,
                       ),
