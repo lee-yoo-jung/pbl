@@ -1,104 +1,110 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
-  runApp(const LoginApp()); // LoginApp 위젯을 실행
-}
-
-// 앱의 최상위 위젯, 앱 전체의 기본 설정을 담당
-class LoginApp extends StatelessWidget {
-  const LoginApp({super.key});
+class PasswordChangePage extends StatefulWidget {
+  const PasswordChangePage ({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: '로그인 데모',
-      theme: ThemeData( // 앱의 전체적인 테마 설정
-        primarySwatch: Colors.blue, // 앱의 기본 색상 팔레트 파란색
-        visualDensity: VisualDensity.adaptivePlatformDensity, // 플랫폼에 따라 UI 밀도 조절
-      ),
-      home: const LoginPage(), // 앱이 시작될 때 보여줄 첫 화면을 지정
-    );
-  }
+  State<PasswordChangePage> createState() => _PasswordChangePageState();
 }
 
-// 상태를 가질 수 있는 위젯. 사용자 입력에 따라 UI가 변해야 하므로 사용
-class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+class _PasswordChangePageState extends State<PasswordChangePage> {
+  final _formKey = GlobalKey<FormState>();
 
-  @override
-  State<LoginPage> createState() => _LoginPageState(); // 이 위젯의 상태를 관리할 객체를 생성
-}
+  // 각 입력 필드의 텍스트를 제어하는 컨트롤러
+  final TextEditingController _currentPasswordController = TextEditingController();
+  final TextEditingController _newPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
 
-// LoginPage의 상태를 관리하는 클래스
-class _LoginPageState extends State<LoginPage> {
-  final _formKey = GlobalKey<FormState>(); // Form 위젯의 상태를 관리하기 위한 전역 키
+  bool _isNewPasswordValid = false;
+  bool _isPasswordMatch = false;
 
-  final TextEditingController _idController = TextEditingController(); // 아이디 입력 필드의 텍스트를 제어
-  final TextEditingController _passwordController = TextEditingController(); // 비밀번호 입력 필드의 텍스트를 제어
+  // 비번 조건: 영문, 숫자, 특수문자가 각각 2종류 이상 조합된 6자 이상
+  static final RegExp _passwordRegex = RegExp(
+      r'^(?=.*[a-zA-Z].*[a-zA-Z])'
+      r'(?=.*[0-9].*[0-9])'
+      r'(?=.*[!@#\$%^&*].*[!@#\$%^&*])'
+      r'.{6,}$'
+  );
 
-  bool _rememberMe = false; // '로그인 정보 기억하기' 체크박스의 상태를 저장하는 변수
-  bool _isPasswordVisible = false;
 
-  // 로그인 정보 기억
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadRememberMe();
-    });
+    // 새 비밀번호와 확인 비밀번호가 변경될 때마다 유효성 검사를 수행하도록 리스너 추가
+    _newPasswordController.addListener(_validateFields);
+    _confirmPasswordController.addListener(_validateFields);
   }
 
   @override
-  void dispose() {
-    _idController.dispose(); // 위젯이 사라질 때 컨트롤러 정리하여 메모리 누수 방지
-    _passwordController.dispose(); // 비밀번호 컨트롤러 정리
+  void dispose() {    // 리스너를 제거하고 컨트롤러를 해제하여 메모리 누수를 방지
+    _newPasswordController.removeListener(_validateFields);
+    _confirmPasswordController.removeListener(_validateFields);
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  void _loadRememberMe() async {   //_loadRememberMe()처럼 await를 사용하는 비동기 함수는 별도로 호출
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _rememberMe = (prefs.getBool('rememberMe') ?? false);
-      if (_rememberMe) {
-        _idController.text = (prefs.getString('id') ?? '');
-        _passwordController.text = (prefs.getString('password') ?? '');
-      }
-    });
+
+  // 모든 유효성 검사 및 버튼 활성화 상태를 업데이트
+  void _validateFields() {
+    final newPass = _newPasswordController.text;
+    final confirmPass = _confirmPasswordController.text;
+
+    // 새 비밀번호 조건 검사
+    final newPasswordValid = _passwordRegex.hasMatch(newPass);
+
+    // 새 비밀번호와 확인 비밀번호 일치 검사
+    final passwordMatch = newPass.isNotEmpty && newPass == confirmPass;
+
+    // 상태가 변경되었을 때만 UI 업데이트
+    if (_isNewPasswordValid != newPasswordValid || _isPasswordMatch != passwordMatch) {
+      setState(() {
+        _isNewPasswordValid = newPasswordValid;
+        _isPasswordMatch = passwordMatch;
+      });
+    }
   }
 
-  // 로그인 시 '로그인 정보 기억하기' 상태를 저장
-  void _validateAndLogin() async {
-    if (_formKey.currentState!.validate()) {
-      String id = _idController.text;
-      String password = _passwordController.text;
 
-      final prefs = await SharedPreferences.getInstance();
+  // '비밀번호 변경' 버튼 활성화 여부를 결정하는 함수
+  bool _isButtonEnabled() {
+    return _currentPasswordController.text.isNotEmpty && _isNewPasswordValid && _isPasswordMatch;
+    // 현재 비밀번호가 비어있지 않고, 새 비밀번호가 유효하며, 두개의 새 비밀번호가 일치해야 함
+  }
 
-      if (_rememberMe) {
-        // 체크박스가 선택된 경우, 아이디, 비밀번호, 상태를 저장
-        await prefs.setString('id', id);
-        await prefs.setString('password', password);
-        await prefs.setBool('rememberMe', true);
-        print('아이디와 비밀번호가 기기에 저장되었습니다.');
-      } else {
-        // 체크박스가 해제된 경우, 저장된 정보를 삭제
-        await prefs.remove('id');
-        await prefs.remove('password');
-        await prefs.remove('rememberMe');
-        print('아이디와 비밀번호가 기기에서 삭제되었습니다.');
-      }
+  // '비밀번호 변경' 버튼 클릭 시 실행될 함수
+  void _changePassword() {
+    // 폼 유효성 검사 및 버튼 활성화 상태 확인
+    if (_formKey.currentState!.validate() && _isButtonEnabled()) {
 
-      // 로그인 성공 시 팝업(AlertDialog)을 띄움
+      // 실제 서버 API 호출을 통해 비밀번호를 변경하는 로직 구현
+
+
+      // 변경 성공 팝업
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('로그인 성공'), // 팝업의 제목
-          content: Text('아이디: $id\n비밀번호: $password\n로그인 정보 기억하기: $_rememberMe'),
+          title: const Text('변경 성공'),
+          content: const Text('비밀번호가 성공적으로 변경되었습니다.'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context), // 버튼을 누르면 팝업이 닫힘
-              child: const Text('확인'), // 버튼에 표시될 텍스트
+              onPressed: () => Navigator.pop(context),
+              child: const Text('확인'),
+            ),
+          ],
+        ),
+      );
+    } else if (!_currentPasswordController.text.isNotEmpty) {   // 현재 비밀번호를 입력하지 않았다면
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('오류'),
+          content: const Text('현재 비밀번호를 입력해주세요.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('확인'),
             ),
           ],
         ),
@@ -106,204 +112,152 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  // '회원가입' 버튼을 눌렀을 때 실행되는 함수
-  void _onSignUpPressed() {
-    print('회원가입 버튼 클릭');
-  }
+  // 비밀번호 입력 필드를 위한 공통 위젯 생성 함수
+  Widget _buildPasswordField({
+    required String label,
+    required TextEditingController controller,
+    bool isNewPassword = false,
+    bool isConfirmPassword = false,
+  }) {
 
-  // 'ID 찾기' 버튼을 눌렀을 때 실행되는 함수
-  void _onFindIdPressed() {
-    print('ID 찾기 버튼 클릭');
-  }
+    // 유효성 검사 상태에 따라 아이콘 결정
+    Widget? getSuffixIcon() {
+      if (isNewPassword) {
+        if (controller.text.isEmpty) return null; // 텍스트가 없으면 아이콘 표시 안 함
+        return Icon(
+          _isNewPasswordValid ? Icons.check_circle : Icons.cancel,
+          color: _isNewPasswordValid ? Colors.green : Colors.red,
+        );
+      }
+      if (isConfirmPassword) {
+        if (controller.text.isEmpty) return null;
+        return Icon(
+          _isPasswordMatch ? Icons.check_circle : Icons.cancel,
+          color: _isPasswordMatch ? Colors.green : Colors.red,
+        );
+      }
+      return null;
+    }
 
-  // 'PW 찾기' 버튼을 눌렀을 때 실행되는 함수
-  void _onFindPwPressed() {
-    print('PW 찾기 버튼 클릭');
-  }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
 
-  // 소셜 로그인 버튼을 눌렀을 때 실행될 함수. 어떤 버튼인지 인자로 받음
-  void _onSocialLoginPressed(String platform) {
-    print('$platform로 소셜 로그인 시도');
+        // 필드 제목
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Colors.black54,
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // 실제 비밀번호 입력 필드
+        TextFormField(
+          controller: controller,
+          obscureText: true,     // 입력 텍스트 가리기
+          decoration: InputDecoration(
+            border: const OutlineInputBorder(
+              borderRadius: BorderRadius.all(Radius.circular(10)),
+            ),
+            prefixIcon: const Icon(Icons.lock_outline),
+            suffixIcon: getSuffixIcon(),
+          ),
+          validator: (value) {
+            // 폼 제출 시 실행되는 최종 유효성 검사
+            if (value == null || value.isEmpty) {
+              return '비밀번호를 입력해주세요.';
+            }
+            if (isNewPassword && !_isNewPasswordValid && value.isNotEmpty) {
+              return '비밀번호 조건을 만족하지 못합니다.';
+            }
+            if (isConfirmPassword && !_isPasswordMatch && value.isNotEmpty) {
+              return '새 비밀번호와 일치하지 않습니다.';
+            }
+            return null; // 유효성 통과
+          },
+        ),
+        const SizedBox(height: 20),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold( // 기본적인 Material 디자인 레이아웃 구조를 제공
+    return Scaffold(
       appBar: AppBar(
-        title: const Text('로그인'),
+        title: const Text('비밀번호 변경'),
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(25),  // 모든 방향에 25의 여백
-          child: Form(                        // 폼을 생성하여 유효성 검사를 쉽게 만듦
-            key: _formKey,                    // 폼의 상태를 관리하기 위해 key를 연결
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center, // 자식들을 세로 방향 중앙에 정렬
-              crossAxisAlignment: CrossAxisAlignment.start, // 자식들을 가로 방향 왼쪽으로 정렬
-              children: [
-                const Text(
-                  'ID',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),    // 위젯 사이에 8만큼의 세로 간격
-                TextFormField(                // 텍스트 입력 필드
-                  controller: _idController,  // _idController와 연결
-                  decoration: const InputDecoration(     // 입력 필드의 디자인 설정
-                    labelText: '아이디',                  // 필드가 비어있을 때 표시될 힌트 텍스트
-                    border: OutlineInputBorder(),        // 테두리
-                    prefixIcon: Icon(Icons.person_outline),      // 필드 왼쪽에 사람 아이콘
-                  ),
-                  validator: (value) {                   // 입력값이 유효한지 검사
-                    if (value == null || value.isEmpty) {
-                      return '아이디를 입력해주세요.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Password',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: !_isPasswordVisible, // 입력된 글자를 숨겨줌 (비밀번호용)
-                  decoration: InputDecoration(
-                    labelText: '비밀번호',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.lock_outline),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
-                        color: Colors.grey,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _isPasswordVisible = !_isPasswordVisible;
-                        });
-                      },
-                    ),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return '비밀번호를 입력해주세요.';
-                    }
-                    if (value.length < 6) {
-                      return '비밀번호는 6자 이상이어야 합니다.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Checkbox(
-                      value: _rememberMe, // 체크박스의 현재 상태(_rememberMe)를 표시
-                      onChanged: (bool? value) { // 체크박스가 눌렸을 때 실행
-                        setState(() { // 위젯의 상태가 변경되었음을 알리고 화면을 다시 그림
-                          _rememberMe = value ?? false; // _rememberMe 변수 값을 업데이트
-                        });
-                      },
-                    ),
-                    const Text('로그인 정보 기억하기'),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton(                 // 튀어나와 보이는 버튼
-                  onPressed: _validateAndLogin, // 버튼을 누르면 _validateAndLogin 함수를 호출
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    minimumSize: const Size(double.infinity, 50), // 가로 전체, 세로 50
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10), // 버튼 모서리를 둥글게
-                    ),
-                  ),
-                  child: const Text(
-                    '로그인',
-                    style: TextStyle(fontSize: 18, color: Colors.white),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    TextButton(
-                      onPressed: _onSignUpPressed, // 버튼을 누르면 _onSignUpPressed 함수를 호출
-                      child: const Text('회원가입', style: TextStyle(color: Colors.blue)),
-                    ),
-                    const Text(' | ', style: TextStyle(color: Colors.grey)),
-                    TextButton(
-                      onPressed: _onFindIdPressed,
-                      child: const Text('ID 찾기', style: TextStyle(color: Colors.blue)),
-                    ),
-                    const Text(' | ', style: TextStyle(color: Colors.grey)),
-                    TextButton(
-                      onPressed: _onFindPwPressed,
-                      child: const Text('PW 찾기', style: TextStyle(color: Colors.blue)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 30),
-                const Divider(height: 1, thickness: 1, color: Colors.grey), // 가로 구분선
-                const SizedBox(height: 20),
-                const Center(
-                  child: Text(
-                    '소셜로그인',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 15),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButton( // 아이콘 형태 버튼
-                      iconSize: 48,
-                      onPressed: () => _onSocialLoginPressed('Google'),
-                      icon: Image.asset(
-                        'assets/images/google.jpg',
-                        width: 48,
-                        height: 48,
-                      ),
-                    ),
-                    const SizedBox(width: 20),
-                    IconButton(
-                      iconSize: 48,
-                      onPressed: () => _onSocialLoginPressed('KakaoTalk'),
-                      icon: Image.asset(
-                        'assets/images/kakao.jpg',
-                        width: 48,
-                        height: 48,
-                      ),
-                    ),
-                    const SizedBox(width: 20),
+      body: SingleChildScrollView(    // 내용이 넘칠 경우 스크롤 가능하게 해줌
+        padding: const EdgeInsets.all(24),
+        child: Form(
+          key: _formKey, // 폼 상태 관리를 위한 키
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
 
-                    IconButton(
-                      iconSize: 48,
-                      onPressed: () => _onSocialLoginPressed('Apple'),
-                      icon: Image.asset(
-                        'assets/images/apple.png',
-                        width: 48,
-                        height: 48,
-                      ),
-                    ),
-                  ],
+              // 현재 비밀번호 입력 필드
+              _buildPasswordField(
+                label: '현재 비밀번호',
+                controller: _currentPasswordController,
+              ),
+
+              // 새 비밀번호 입력 필드
+              _buildPasswordField(
+                label: '새 비밀번호',
+                controller: _newPasswordController,
+                isNewPassword: true,
+              ),
+
+              // 새 비밀번호 확인 입력 필드
+              _buildPasswordField(
+                label: '새 비밀번호 확인',
+                controller: _confirmPasswordController,
+                isConfirmPassword: true,
+              ),
+
+              // 비밀번호 조건 안내 텍스트
+              const Padding(
+                padding: EdgeInsets.only(bottom: 30),
+                child: Text(
+                  '※ 영문, 숫자, 특수문자가 각각 2개 이상 포함된 6자 이상',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
+                  ),
                 ),
-              ],
-            ),
+              ),
+
+              // 비밀번호 변경 버튼
+              ElevatedButton(
+                // _isButtonEnabled() 결과에 따라 버튼 활성화/비활성화 결정
+                onPressed: _isButtonEnabled() ? _changePassword : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  minimumSize: const Size(double.infinity, 55),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  elevation: 5,
+                ),
+                child: const Text(
+                  '비밀번호 변경',
+                  style: TextStyle(fontSize: 18, color: Colors.white),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+}
+
+// 실행
+void main() {
+  runApp(const MaterialApp(
+    home: PasswordChangePage(),
+  ));
 }
