@@ -179,6 +179,9 @@ class _GoalTypeSelectorPageState extends State<GoalTypeSelectorPage> {
                 // 선택된 목표가 있을 때만 버튼 활성화, 없으면 비활성화
                 onPressed: () {
                   _selectedGoals.isNotEmpty ? _handleSave : null;
+                  final message = '저장되었습니다.';
+                  debugPrint(message);
+                  _showSuccessNotification(message); // 성공 메시지 출력
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => MyPage()),
