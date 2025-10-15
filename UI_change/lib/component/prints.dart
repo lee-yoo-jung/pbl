@@ -224,7 +224,7 @@ class PrintsState extends State<Prints>{
 
                                 //계획 컨테이너
                                 child: Container(
-                                  width: 350,
+                                  width: 300,
                                   height: 31,
                                   padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5), // 안쪽 여백
                                   decoration: BoxDecoration(
