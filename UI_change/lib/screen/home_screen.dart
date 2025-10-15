@@ -107,8 +107,8 @@ class _HomeScreenState extends State<HomeScreen>{
             //Prints 위젯 배치
             Expanded(
               child: DraggableScrollableSheet(
-                initialChildSize: 0.20,  //화면의 초기 크기
-                minChildSize: 0.20,      //최소 크기
+                initialChildSize: 0.1,  //화면의 초기 크기
+                minChildSize: 0.1,      //최소 크기
                 maxChildSize: 0.8,        //최대 크기
                 builder: (context,scrollController)=>Prints(
                   selectedDate: selectedDate,           //선택된 날짜
