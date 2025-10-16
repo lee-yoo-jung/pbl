@@ -1,6 +1,5 @@
-//회원가입 화면
-// lib/sign_up_page.dart
 import 'package:flutter/material.dart';
+import 'dart:math';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -17,9 +16,15 @@ class _SignUpPageState extends State<SignUpPage> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _passwordConfirmController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _verificationCodeController = TextEditingController(); // 인증 코드 입력 컨트롤러
 
   bool _obscurePassword = true;
   bool _obscurePasswordConfirm = true;
+
+  // 이메일 인증 관련 상태 변수
+  bool _isEmailVerified = false; // 이메일 인증이 완료되었는지 여부
+  bool _verificationCodeSent = false; // 인증 코드가 전송되었는지 여부
+  String? _verificationCode; // 실제 전송된 인증 코드를 저장
 
   @override
   void dispose() {
@@ -28,11 +33,110 @@ class _SignUpPageState extends State<SignUpPage> {
     _passwordController.dispose();
     _passwordConfirmController.dispose();
     _emailController.dispose();
+    _verificationCodeController.dispose(); // 추가된 컨트롤러 dispose
     super.dispose();
   }
 
+  // 더미 인증 코드 전송 로직
+  void _sendVerificationCode() async {
+    // 이메일 입력 필드 유효성만 확인
+    if (!_validateEmailField()) {
+      return;
+    }
+
+    // 백엔드 API 호출 (이메일 전송) 로직
+    setState(() {
+      _verificationCodeSent = true;
+      _isEmailVerified = false;
+      // 6자리 랜덤 숫자 코드 생성 (더미)
+      _verificationCode = (Random().nextInt(900000) + 100000).toString();
+      _verificationCodeController.clear(); // 코드 재전송 시 입력 필드 초기화
+    });
+
+    // 사용자에게 전송 알림 (실제로는 이메일로 전송됨)
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('인증 코드가 전송되었습니다. (더미 코드: $_verificationCode)'),
+        duration: const Duration(seconds: 5),
+      ),
+    );
+  }
+
+  // 이메일 입력 필드의 유효성을 개별적으로 검증하는 함수
+  bool _validateEmailField() {
+    // FormFieldState를 얻기 위한 GlobalKey가 필요하거나,
+    // 이메일 TextFormField의 validator 로직을 복사하여 사용
+    final emailValue = _emailController.text;
+    if (emailValue.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('이메일을 입력해주세요.')),
+      );
+      return false;
+    }
+    if (!RegExp(r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+").hasMatch(emailValue)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('올바른 이메일 형식이 아닙니다.')),
+      );
+      return false;
+    }
+    return true;
+  }
+
+  // 인증 코드 확인 로직
+  void _verifyCode() {
+    final enteredCode = _verificationCodeController.text.trim();
+
+    if (_verificationCode == null) {
+      // 코드가 전송되지 않은 경우
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('먼저 이메일 인증을 요청해주세요.')),
+      );
+      return;
+    }
+
+    if (enteredCode.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('인증 코드를 입력해주세요.')),
+      );
+      return;
+    }
+
+    if (enteredCode == _verificationCode) {
+      setState(() {
+        _isEmailVerified = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('이메일 인증이 완료되었습니다.', style: TextStyle(color: Colors.white)), backgroundColor: Colors.green),
+      );
+    } else {
+      setState(() {
+        _isEmailVerified = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('인증 코드가 일치하지 않습니다.', style: TextStyle(color: Colors.white)), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   void _submitSignUpForm() {
-    if (_formKey.currentState!.validate()) { // 이 시점에 모든 validator가 호출됨
+    if (!_isEmailVerified) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('알림'),
+          content: const Text('이메일 인증을 완료해주세요.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('확인'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    if (_formKey.currentState!.validate()) {
       String name = _nameController.text;
       String id = _idController.text;
       String password = _passwordController.text;
@@ -47,13 +151,13 @@ class _SignUpPageState extends State<SignUpPage> {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('회원가입 성공'),
+          title: const Text('회원가입 성공 🎉'),
           content: Text('이름: $name\n아이디: $id\n이메일: $email\n\n회원가입이 완료되었습니다.'),
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context);
-                Navigator.pop(context);
+                Navigator.pop(context); // 팝업 닫기
+                Navigator.pop(context); // 회원가입 페이지 닫기 (이전 화면으로 돌아감)
               },
               child: const Text('확인'),
             ),
@@ -65,6 +169,12 @@ class _SignUpPageState extends State<SignUpPage> {
 
   @override
   Widget build(BuildContext context) {
+    // 모든 ElevatedButton에 적용할 파란색 스타일
+    final ButtonStyle blueButtonStyle = ElevatedButton.styleFrom(
+      backgroundColor: Colors.blue, // 배경색을 파란색으로 명시
+      foregroundColor: Colors.white, // 텍스트 색상을 흰색으로
+    );
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('회원가입'),
@@ -75,7 +185,7 @@ class _SignUpPageState extends State<SignUpPage> {
           key: _formKey,
           child: ListView(
             children: <Widget>[
-              // 이름 입력 필드 (이전과 동일)
+              // 이름 입력 필드
               const Text(
                 '이름',
                 style: TextStyle(
@@ -105,7 +215,7 @@ class _SignUpPageState extends State<SignUpPage> {
               ),
               const SizedBox(height: 20),
 
-              // 아이디 입력 필드 (이전과 동일)
+              // 아이디 입력 필드
               const Text(
                 '아이디',
                 style: TextStyle(
@@ -164,23 +274,12 @@ class _SignUpPageState extends State<SignUpPage> {
                   if (value.length < 6) {
                     return '비밀번호는 6자 이상이어야 합니다.';
                   }
-                  // **StackOverflow 원인 제거:** 아래 라인 제거 또는 주석 처리
-                  // if (_passwordConfirmController.text.isNotEmpty) {
-                  //   _formKey.currentState?.validate(); // <--- 이 부분 제거!
-                  // }
                   return null;
                 },
-                // 비밀번호가 변경될 때 비밀번호 확인 필드의 UI를 업데이트하기 위해 setState 호출
                 onChanged: (value) {
-                  // 비밀번호 확인 필드의 체크 아이콘 등을 즉시 업데이트하고 싶다면
-                  // 그리고 비밀번호 확인 필드가 이미 내용을 가지고 있다면 해당 필드의 유효성만 다시 체크할 수 있도록
-                  // _formKey.currentState?.validate() 대신 다른 방법을 사용하거나,
-                  // 혹은 비밀번호 확인 필드의 onChanged 에서 setState만 호출하도록 한다.
-                  // 여기서는 비밀번호 확인 필드의 onChanged 에서 이미 setState를 호출하고 있으므로 추가 작업이 필요 없을 수 있음.
-                  // 또는 명시적으로 비밀번호 확인 필드만 재검증하고 싶다면 해당 필드의 FormFieldState를 직접 다뤄야 함 (더 복잡)
-                  // 가장 간단한 것은 비밀번호 확인 필드의 onChanged에서 setState({})를 호출하는 것입니다.
+                  // 비밀번호 확인 필드 UI 갱신을 위해
                   if (_passwordConfirmController.text.isNotEmpty) {
-                    setState(() {}); // 비밀번호 확인 필드의 suffixIcon UI 갱신을 위해
+                    setState(() {});
                   }
                 },
               ),
@@ -236,7 +335,7 @@ class _SignUpPageState extends State<SignUpPage> {
               ),
               const SizedBox(height: 20),
 
-              // 이메일 입력 필드 (이전과 동일)
+              // 이메일 입력 필드 및 인증 버튼
               const Text(
                 '이메일',
                 style: TextStyle(
@@ -245,33 +344,118 @@ class _SignUpPageState extends State<SignUpPage> {
                 ),
               ),
               const SizedBox(height: 8),
-              TextFormField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  labelText: '이메일 주소를 입력해주세요',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.email_outlined),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return '이메일을 입력해주세요.';
-                  }
-                  if (!RegExp(r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+").hasMatch(value)) {
-                    return '올바른 이메일 형식이 아닙니다.';
-                  }
-                  return null;
-                },
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start, // 오류 메시지를 고려
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      enabled: !_isEmailVerified, // 인증 완료 후에는 수정 불가
+                      decoration: InputDecoration(
+                        labelText: '이메일 주소를 입력해주세요',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.email_outlined),
+                        suffixIcon: _isEmailVerified
+                            ? const Icon(Icons.check_circle, color: Colors.green)
+                            : null, // 인증 완료 시 체크 표시
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return '이메일을 입력해주세요.';
+                        }
+                        if (!RegExp(r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+").hasMatch(value)) {
+                          return '올바른 이메일 형식이 아닙니다.';
+                        }
+                        return null;
+                      },
+                      onChanged: (value) {
+                        // 이메일 내용 변경 시 인증 상태 초기화
+                        if (_isEmailVerified) {
+                          setState(() {
+                            _isEmailVerified = false;
+                            _verificationCodeSent = false;
+                            _verificationCode = null;
+                            _verificationCodeController.clear();
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: _isEmailVerified
+                        ? null // 인증 완료 시 버튼 비활성화
+                        : _sendVerificationCode,
+                    style: blueButtonStyle.copyWith(
+                      // 비활성화 상태일 때는 회색을 유지
+                      backgroundColor: MaterialStateProperty.resolveWith<Color?>(
+                            (Set<MaterialState> states) {
+                          if (states.contains(MaterialState.disabled)) {
+                            return Colors.grey;
+                          }
+                          return blueButtonStyle.backgroundColor?.resolve({});
+                        },
+                      ),
+                      minimumSize: MaterialStateProperty.all(const Size(100, 50)),
+                    ),
+                    child: Text(
+                      _verificationCodeSent ? '재전송' : '인증하기',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ],
               ),
+
+              // 인증 코드 입력 필드 (코드가 전송된 후에만 표시)
+              if (_verificationCodeSent && !_isEmailVerified)
+                Padding(
+                  padding: const EdgeInsets.only(top: 15.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _verificationCodeController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: '인증 코드를 입력해주세요 (6자리)',
+                            hintText: '인증 코드',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.vpn_key_outlined),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return '인증 코드를 입력해주세요.';
+                            }
+                            if (value.length != 6 || int.tryParse(value) == null) {
+                              return '6자리 숫자를 입력해주세요.';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: _verifyCode,
+                        style: blueButtonStyle.copyWith(
+                          minimumSize: MaterialStateProperty.all(const Size(100, 50)),
+                        ),
+                        child: const Text('확인', style: TextStyle(fontSize: 16)),
+                      ),
+                    ],
+                  ),
+                ),
               const SizedBox(height: 30),
 
-              // 가입하기 버튼 (이전과 동일)
+              // 가입하기 버튼
               ElevatedButton(
                 onPressed: _submitSignUpForm,
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                style: blueButtonStyle.copyWith(
+                  minimumSize: MaterialStateProperty.all(const Size(double.infinity, 50)),
+                  shape: MaterialStateProperty.all(
+                    RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
                 child: const Text(
@@ -286,4 +470,3 @@ class _SignUpPageState extends State<SignUpPage> {
     );
   }
 }
-
