@@ -26,6 +26,14 @@ class _SignUpPageState extends State<SignUpPage> {
   bool _verificationCodeSent = false; // 인증 코드가 전송되었는지 여부
   String? _verificationCode; // 실제 전송된 인증 코드를 저장
 
+  // 비번 조건: 영문, 숫자, 특수문자가 각각 2종류 이상 조합된 6자 이상
+  static final RegExp _passwordRegex = RegExp(
+      r'^(?=.*[a-zA-Z].*[a-zA-Z])'
+      r'(?=.*[0-9].*[0-9])'
+      r'(?=.*[!@#\$%^&*].*[!@#\$%^&*])'
+      r'.{6,}$'
+  );
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -33,7 +41,7 @@ class _SignUpPageState extends State<SignUpPage> {
     _passwordController.dispose();
     _passwordConfirmController.dispose();
     _emailController.dispose();
-    _verificationCodeController.dispose(); // 추가된 컨트롤러 dispose
+    _verificationCodeController.dispose();
     super.dispose();
   }
 
@@ -44,7 +52,7 @@ class _SignUpPageState extends State<SignUpPage> {
       return;
     }
 
-    // 백엔드 API 호출 (이메일 전송) 로직
+    // 백엔드 API 호출 로직
     setState(() {
       _verificationCodeSent = true;
       _isEmailVerified = false;
@@ -151,7 +159,7 @@ class _SignUpPageState extends State<SignUpPage> {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('회원가입 성공 🎉'),
+          title: const Text('회원가입 성공'),
           content: Text('이름: $name\n아이디: $id\n이메일: $email\n\n회원가입이 완료되었습니다.'),
           actions: [
             TextButton(
@@ -271,8 +279,9 @@ class _SignUpPageState extends State<SignUpPage> {
                   if (value == null || value.isEmpty) {
                     return '비밀번호를 입력해주세요.';
                   }
-                  if (value.length < 6) {
-                    return '비밀번호는 6자 이상이어야 합니다.';
+                  // 비밀번호 조건 유효성 검사
+                  if (!_passwordRegex.hasMatch(value)) {
+                    return '비밀번호 조건을 만족하지 못합니다.';
                   }
                   return null;
                 },
@@ -283,7 +292,16 @@ class _SignUpPageState extends State<SignUpPage> {
                   }
                 },
               ),
-              const SizedBox(height: 20),
+              const Padding(
+                padding: EdgeInsets.only(top: 4, bottom: 20),
+                child: Text(
+                  '※ 영문, 숫자, 특수문자가 각각 2개 이상 포함된 6자 이상',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
+                  ),
+                ),
+              ),
 
               // 비밀번호 확인 입력 필드
               const Text(
@@ -326,6 +344,9 @@ class _SignUpPageState extends State<SignUpPage> {
                   }
                   if (value != _passwordController.text) {
                     return '비밀번호가 일치하지 않습니다.';
+                  }
+                  if (!_passwordRegex.hasMatch(_passwordController.text)) {
+                    return '새 비밀번호가 조건을 만족하지 못합니다.';
                   }
                   return null;
                 },
