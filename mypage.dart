@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:pbl_mid/tap/mypages/component/GoalTypeSetting.dart';
+import 'package:pbl_mid/tap/mypages/component/NotificationSetting.dart';
+import 'package:pbl_mid/tap/mypages/component/PwChange.dart';
+import 'package:pbl_mid/tap/mypages/component/chart/showchart.dart';
 
 class MyPage extends StatefulWidget {
   const MyPage({super.key});
@@ -161,8 +165,12 @@ class _MyPageState extends State<MyPage> {
           const Divider(height: 20),
           // 목표 데이터 분석
           InkWell(
-            onTap: () { /* 목표 데이터 분석 화면으로 이동 */ },
-            child: const Row(
+            onTap: () { /* 목표 데이터 분석 화면으로 이동 */
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context)=> chart()),
+              );},
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('목표 데이터 분석', style: TextStyle(fontSize: 15)),
@@ -185,7 +193,11 @@ class _MyPageState extends State<MyPage> {
           const SizedBox(height: 10),
           _buildSettingsItem(
             text: '비밀번호 변경',
-            onTap: () { /* 비밀번호 변경 화면으로 이동 */ },
+            onTap: () { /* 비밀번호 변경 화면으로 이동 */
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => PasswordChangePage()),
+              );},
           ),
           _buildSettingsItem(
             text: '프로필 공개',
@@ -201,11 +213,21 @@ class _MyPageState extends State<MyPage> {
           ),
           _buildSettingsItem(
             text: '목표 유형 설정',
-            onTap: () { /* 목표 유형 설정 화면으로 이동 */ },
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => MyApp()),
+              );
+            },
           ),
           _buildSettingsItem(
             text: '알림 설정',
-            onTap: () { /* 알림 설정 화면으로 이동 */ },
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => Notification1()),
+              );
+            },
           ),
           const Divider(height: 20),
           _buildSettingsItem(
