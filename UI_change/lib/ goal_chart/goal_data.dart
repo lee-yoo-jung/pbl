@@ -35,4 +35,5 @@ final List<GoalRecord> allGoalData = [
   GoalRecord(date: DateTime(2025, 9), totalGoals: 32, achievedGoals: 28),
   GoalRecord(date: DateTime(2025, 10), totalGoals: 30, achievedGoals: 30),
   GoalRecord(date: DateTime(2025, 11), totalGoals: 25, achievedGoals: 8),
+
 ];
