@@ -1,83 +1,161 @@
 //grouptap.dart  그룹 탭
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
+
+// 세부 계획 데이터 모델
+class SubTask {
+  final String name;               // 세부 계획 이름
+  final List<String> completedBy;  // 완료한 사람 목록
+
+  SubTask({
+    required this.name,
+    required this.completedBy,
+  });
+
+  // 특정 참가자가 이 세부 계획을 완료했는지 확인
+  bool isCompletedBy(String userName) => completedBy.contains(userName);
+}
+
 
 // 목표 데이터 모델 (Goal Model)
 class Goal {
   final String id;
   String name;
   List<String> participants; // 참가 인원 목록
-  double totalTargetTimeHours; // 목표 달성 총 시간 (1인당 기준 시간)
-  Map<String, double> userCompletedTimeHours; // { '참가자 이름': 완료 시간 }
+  List<SubTask> subTasks;
 
   Goal({
     required this.id,
     required this.name,
     required this.participants,
-    required this.totalTargetTimeHours,
-    required this.userCompletedTimeHours,
+    required this.subTasks,
   });
 
-  // 목표 달성을 위해 전체 참가자가 완료해야 하는 총 시간 (100% 기준)
-  double get totalRequiredHours => totalTargetTimeHours * participants.length;
+  // 목표 달성을 위해 필요한 전체 세부 계획 수 (총 계획 수)
+  int get totalSubTasks => subTasks.length;
 
-  // 현재까지 참가자들이 완료한 총 시간 (분자)
-  double get currentCompletedHours {
-    return userCompletedTimeHours.values.fold(0.0, (sum, time) => sum + time);
+  // 목표 달성을 위해 전체 참가자가 완료해야 하는 총 계획 단위 (100% 기준)
+  // (총 계획 수 * 전체 참가자 수)
+  int get totalRequiredPlanUnits => totalSubTasks * participants.length;
+
+  // 현재까지 모든 참가자가 완료한 세부 계획의 총 수
+  // (각 세부 계획에 대해 완료한 참가자의 수를 합산)
+  int get totalCompletedPlanUnits {
+    return subTasks.fold(
+      0,
+          (sum, task) => sum + task.completedBy.length,
+    );
   }
 
   // 그룹 전체 달성률 계산 로직 (0.0 ~ 1.0)
+  // (현재 완료된 계획 단위 수 / 전체 필요 계획 단위 수)
   double get completionRate {
-    if (totalRequiredHours == 0) return 0.0;
-    return currentCompletedHours / totalRequiredHours;
+    if (totalRequiredPlanUnits == 0) return 0.0;
+    return totalCompletedPlanUnits / totalRequiredPlanUnits;
   }
 
   // 그룹 전체 달성률 퍼센트 (0 ~ 100)
-  int get completionPercentage => (completionRate * 100).round();
+  int get completionPercentage => (completionRate.clamp(0.0, 1.0) * 100).round();
 
   // 목표가 완료되었는지 확인 (100% 이상)
   bool get isCompleted => completionRate >= 1.0;
 
+  // 개별 참가자가 완료한 세부 계획 수
+  int getIndividualCompletedCount(String userName) {
+    return subTasks.where((task) => task.isCompletedBy(userName)).length;
+  }
+
   // 개별 참가자의 달성률 계산
   int getIndividualCompletionPercentage(String userName) {
-    final completedTime = userCompletedTimeHours[userName] ?? 0.0;
-    if (totalTargetTimeHours == 0) return 0;
+    if (totalSubTasks == 0) return 0;
 
-    final rate = completedTime / totalTargetTimeHours;
+    final completedCount = getIndividualCompletedCount(userName);
+    final rate = completedCount / totalSubTasks;
     // 100%를 초과할 수 없도록 clamp 적용
     return (rate.clamp(0.0, 1.0) * 100).round();
   }
 
-  // 특정 참가자의 완료 시간을 업데이트하는 메서드
-  void addCompletionTime(String userName, double hours) {
-    userCompletedTimeHours[userName] = (userCompletedTimeHours[userName] ?? 0.0) + hours;
+  // 특정 참가자의 특정 세부 계획 완료 상태를 토글하는 임시 메서드
+  void toggleSubTaskCompletion(String userName, SubTask task) {
+    if (task.completedBy.contains(userName)) {
+      task.completedBy.remove(userName);
+    } else {
+      task.completedBy.add(userName);
+    }
   }
 }
 
 
-// Mock 데이터 (가상 데이터)
+// Mock 데이터
 final List<Goal> mockGoals = [
   Goal(
     id: 'G001',
     name: "토익 900점 이상 받기",
     participants: ["현재 사용자", "지수", "민준", "유나"],
-    totalTargetTimeHours: 20.0,
-    userCompletedTimeHours: {"현재 사용자": 5.0, "지수": 5.0, "민준": 3.0, "유나": 0.0},
+    // 총 5개의 세부 계획
+    subTasks: [
+      SubTask(name: "RC 문법 강의 완강", completedBy: ["현재 사용자", "지수"]),
+      SubTask(name: "LC 쉐도잉 100회", completedBy: ["현재 사용자", "지수", "민준"]),
+      SubTask(name: "실전 모의고사 1회", completedBy: ["현재 사용자"]),
+      SubTask(name: "오답 노트 정리", completedBy: []), // 아무도 완료하지 않음
+      SubTask(name: "단어장 100% 암기", completedBy: ["현재 사용자", "지수", "민준", "유나"]), // 모두 완료
+    ],
   ),
   Goal(
     id: 'G002',
     name: "체중 5kg 감량",
     participants: ["현재 사용자", "선우"],
-    totalTargetTimeHours: 5.0,
-    userCompletedTimeHours: {"현재 사용자": 5.0, "선우": 5.0},
+    // 총 2개의 세부 계획 (100% 달성 상태)
+    subTasks: [
+      SubTask(name: "매일 30분 달리기", completedBy: ["현재 사용자", "선우"]),
+      SubTask(name: "야식 끊기", completedBy: ["현재 사용자", "선우"]),
+    ],
   ),
   Goal(
     id: 'G003',
     name: "시험 만점",
     participants: ["현재 사용자", "은지", "태형", "수민", "현우"],
-    totalTargetTimeHours: 30.0,
-    userCompletedTimeHours: {"현재 사용자": 2.0, "은지": 1.0, "태형": 0.5, "수민": 2.0, "현우": 1.5},
+    // 총 4개의 세부 계획
+    subTasks: [
+      SubTask(name: "개념 요약본 만들기", completedBy: ["현재 사용자", "은지", "태형", "수민", "현우"]),
+      SubTask(name: "기출 문제 풀이", completedBy: ["현재 사용자", "은지"]),
+      SubTask(name: "심화 문제 풀이", completedBy: []),
+      SubTask(name: "핵심 개념 암기", completedBy: ["현재 사용자", "은지", "태형"]),
+    ],
   ),
 ];
+
+
+// 목표 완료 팝업 기록을 위한 전역 상태 (Static)
+// 팝업이 이미 표시되었는지 추적하는 Set을 State 밖으로 옮겨서
+// 위젯이 파괴되어도 값이 유지됨
+final Set<String> _globallyCompletedGoalsShown = <String>{};
+
+
+// 메인 앱 및 그룹 목표 리스트 페이지
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  initializeDateFormatting().then((_) {
+    runApp(const GoalTrackingApp());
+  });
+}
+
+class GoalTrackingApp extends StatelessWidget {
+  const GoalTrackingApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: '그룹 목표 달성 앱',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        fontFamily: 'Inter',
+        useMaterial3: true,
+      ),
+      home: const GroupGoalPage(),
+    );
+  }
+}
 
 class GroupGoalPage extends StatefulWidget {
   const GroupGoalPage({super.key});
@@ -90,14 +168,21 @@ class _GroupGoalPageState extends State<GroupGoalPage> {
   final List<Goal> goals = mockGoals;
   final String currentUser = "현재 사용자";
 
-  // 목표 완료 팝업을 표시하는 함수
+
   void _showCompletionPopup(String goalName) {
+    // 팝업이 이미 표시되었는지 전역 Set에서 다시 한번 확인
+    if (_globallyCompletedGoalsShown.contains(goalName)) return;
+
+    // 팝업 표시 후 전역 Set에 추가 ( setState() 호출 전에)
+    // setState를 호출하여 UI를 업데이트할 필요가 없으므로 setState를 제거
+    _globallyCompletedGoalsShown.add(goalName);
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text("🎉 목표 완료!"),
+          title: const Text("목표 완료!"),
           content: Text("공동 목표 '$goalName'이(가) 달성률 100%로 완료되었습니다! 축하합니다!", style: const TextStyle(fontSize: 16)),
           actions: <Widget>[
             TextButton(
@@ -110,6 +195,19 @@ class _GroupGoalPageState extends State<GroupGoalPage> {
         );
       },
     );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // 위젯이 처음 빌드된 후 (첫 프레임 렌더링 후) 한 번만 실행되도록 예약
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (var goal in goals) {
+        if (goal.isCompleted) {
+          _showCompletionPopup(goal.name);
+        }
+      }
+    });
   }
 
   @override
@@ -138,7 +236,10 @@ class _GroupGoalPageState extends State<GroupGoalPage> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => GoalDetailPage(goal: goals[index]),
+                        builder: (context) => GoalDetailPage(
+                            goal: goals[index],
+                            currentUser: currentUser // 현재 사용자 이름 전달
+                        ),
                       ),
                     );
                   },
@@ -152,11 +253,10 @@ class _GroupGoalPageState extends State<GroupGoalPage> {
   }
 }
 
-
-// 목표 카드 위젯 (GoalCard) - 그룹 목표 리스트 항목
+// 목표 카드 위젯
 class GoalCard extends StatelessWidget {
   final Goal goal;
-  final VoidCallback? onTap; // 탭 이벤트 콜백 추가
+  final VoidCallback? onTap;
 
   const GoalCard({
     required this.goal,
@@ -210,10 +310,9 @@ class GoalCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       elevation: 4,
-      // Card 위젯을 InkWell로 감싸서 탭 이벤트를 추가
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12), // Card의 BorderRadius와 일치시킴
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -281,16 +380,16 @@ class GoalCard extends StatelessWidget {
   }
 }
 
-
-// 목표 상세 페이지 (GoalDetailPage) - 개인 목표 달성률 표시
+// 목표 상세 페이지
 class GoalDetailPage extends StatelessWidget {
   final Goal goal;
+  final String currentUser;
+  const GoalDetailPage({required this.goal, required this.currentUser, super.key});
 
-  const GoalDetailPage({required this.goal, super.key});
 
-  // 독촉하기 버튼 클릭 시 실행될 임시 함수
-  void _nudge(String userName) {
-    print('$userName 님에게 독촉 알림을 보냅니다');
+  void _nudge(String userName, int completedCount, int totalCount) {
+    // 독촉하기 버튼 클릭 시, 현재 달성률을 콘솔에 출력 (디버깅용)
+    print('$userName 님에게 독촉 알림을 보냅니다. (현재 완료 수: $completedCount / $totalCount)');
   }
 
   @override
@@ -311,13 +410,28 @@ class GoalDetailPage extends StatelessWidget {
           // 목표 이름 헤더
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Text(
-              goal.name,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-                color: Colors.black87,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  goal.name,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                // 세부 계획 수 정보를 추가로 표시
+                Text(
+                  '총 세부 계획 수: ${goal.totalSubTasks}개',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.normal,
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -327,11 +441,12 @@ class GoalDetailPage extends StatelessWidget {
               itemCount: goal.participants.length,
               itemBuilder: (context, index) {
                 final userName = goal.participants[index];
-                // 각 참가자의 완료 시간 (시간 단위)
-                final completedHours = goal.userCompletedTimeHours[userName] ??
-                    0.0;
-                final percentage = goal.getIndividualCompletionPercentage(
-                    userName);
+                final bool isCurrentUser = userName == currentUser;
+
+                // 개인이 완료한 세부 계획 수
+                final completedCount = goal.getIndividualCompletedCount(userName);
+                // 개별 달성률 퍼센트
+                final percentage = goal.getIndividualCompletionPercentage(userName);
                 final normalizedRate = percentage / 100.0;
 
                 return Padding(
@@ -357,6 +472,13 @@ class GoalDetailPage extends StatelessWidget {
                                   userName, // 닉네임
                                   style: const TextStyle(fontSize: 16,
                                       fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 4),
+                                // 완료된 세부 계획 수 표시
+                                Text(
+                                  '완료: $completedCount / ${goal.totalSubTasks}개',
+                                  style: const TextStyle(fontSize: 12,
+                                      color: Colors.blueGrey),
                                 ),
                                 const SizedBox(height: 4),
 
@@ -397,24 +519,26 @@ class GoalDetailPage extends StatelessWidget {
                           const SizedBox(width: 12),
 
                           // 독촉하기 버튼
-                          ElevatedButton(
-                            onPressed: () => _nudge(userName),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red.shade400,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                          // isCurrentUser 변수를 사용하여 현재 사용자가 아닐 때만 버튼을 표시
+                          if (!isCurrentUser)
+                            ElevatedButton(
+                              onPressed: () => _nudge(userName, completedCount, goal.totalSubTasks),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red.shade400,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 8),
+                                elevation: 3,
                               ),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 8),
-                              elevation: 3,
+                              child: const Text(
+                                "독촉하기",
+                                style: TextStyle(
+                                    fontSize: 14, fontWeight: FontWeight.bold),
+                              ),
                             ),
-                            child: const Text(
-                              "독촉하기",
-                              style: TextStyle(
-                                  fontSize: 14, fontWeight: FontWeight.bold),
-                            ),
-                          ),
                         ],
                       ),
                     ),
