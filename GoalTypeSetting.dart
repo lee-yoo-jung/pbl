@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:calendar/component/mypage.dart';
 
 const List<String> goalTypes = [
   '입시',
@@ -10,11 +11,6 @@ const List<String> goalTypes = [
   '취미',
   '기타',
 ];
-
-void main() {
-  runApp(const MyApp());
-}
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -181,7 +177,20 @@ class _GoalTypeSelectorPageState extends State<GoalTypeSelectorPage> {
               padding: const EdgeInsets.only(bottom: 24.0, top: 16.0),
               child: ElevatedButton(
                 // 선택된 목표가 있을 때만 버튼 활성화, 없으면 비활성화
-                onPressed: _selectedGoals.isNotEmpty ? _handleSave : null,
+                onPressed: () {
+                  _selectedGoals.isNotEmpty ? _handleSave : null;
+                  final message = '저장되었습니다.';
+                  debugPrint(message);
+                  _showSuccessNotification(message); // 성공 메시지 출력
+
+                  /*
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => MyPage()),
+                  );
+                   */
+                  Navigator.pop(context);
+                },
                 child: const Text(
                   '저장',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),

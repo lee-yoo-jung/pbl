@@ -12,7 +12,12 @@ class RankUser {
 
 // 랭킹 페이지 메인 위젯
 class RankingTap extends StatefulWidget {
-  const RankingTap({super.key});
+  final bool isRankingPublic;
+
+  const RankingTap({
+    super.key,
+    required this.isRankingPublic,
+  });
 
   @override
   State<RankingTap> createState() => _RankingTapState();
@@ -37,6 +42,27 @@ class _RankingTapState extends State<RankingTap> {
 
   @override
   Widget build(BuildContext context) {
+    // [수정 2] 전달받은 isRankingPublic 값에 따라 다른 화면을 보여줌
+    // StatefulWidget에서는 widget.isRankingPublic 으로 접근
+    if (!widget.isRankingPublic) {
+      // 랭킹 공개가 OFF일 경우 안내 문구 화면을 보여줌
+      return Scaffold(
+        backgroundColor: Colors.white,
+        appBar: _buildCommonAppBar(), // 공통 AppBar 사용
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Text(
+              "랭킹을 보려면 마이페이지에서 '랭킹 보기'를 ON으로 설정하세요.",
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+            ),
+          ),
+        ),
+      );
+    }
+
+    //랭킹보기 = on
     return DefaultTabController(
       length: 2, // 탭 개수: 전체, 친구
       child: Scaffold(
@@ -78,6 +104,23 @@ class _RankingTapState extends State<RankingTap> {
         ),
 
       ),
+    );
+  }
+
+  // [수정 3] 중복되는 AppBar를 공통 함수로 분리
+  AppBar _buildCommonAppBar({PreferredSizeWidget? bottom}) {
+    return AppBar(
+      backgroundColor: Colors.blue,
+      title: const Row(
+        children: [
+          Icon(Icons.emoji_events, color: Colors.white),
+          SizedBox(width: 8),
+          Text('랭킹', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        ],
+      ),
+      elevation: 0,
+      bottom: bottom, // TabBar가 있을 경우에만 bottom이 추가됨
+      automaticallyImplyLeading: false, // AppBar의 뒤로가기 버튼 자동 생성 방지
     );
   }
 

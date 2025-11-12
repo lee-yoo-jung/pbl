@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:calendar/component/mypage.dart';
 
-void main() {
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class Notification1 extends StatelessWidget {
+  Notification1({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -324,7 +321,14 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
 
                   // 데이터베이스에 실제 설정 값 저장 로직 추가
 
+                  /*
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => MyPage()),
+                  );
+                  */
 
+                  Navigator.pop(context);
 
                 },
                 style: ElevatedButton.styleFrom(

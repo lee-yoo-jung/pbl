@@ -1,18 +1,37 @@
+//mypage.dart 마이페이지
 import 'package:flutter/material.dart';
-import 'package:pbl_mid/tap/mypages/component/GoalTypeSetting.dart';
-import 'package:pbl_mid/tap/mypages/component/NotificationSetting.dart';
-import 'package:pbl_mid/tap/mypages/component/PwChange.dart';
-import 'package:pbl_mid/tap/mypages/component/chart/showchart.dart';
+import 'package:calendar/component/GoalTypeSetting.dart';
+import 'package:calendar/component/NotificationSetting.dart';
+import 'package:calendar/component/PwChange.dart';
+import 'package:calendar/services/auth_service.dart';
+
+final AuthService _authService = AuthService();
 
 class MyPage extends StatefulWidget {
-  const MyPage({super.key});
+  final bool isRankingPublic;
+  final ValueChanged<bool> onRankingChanged;
+
+  const MyPage({
+    super.key,
+    required this.isRankingPublic,
+    required this.onRankingChanged,
+  });
 
   @override
   State<MyPage> createState() => _MyPageState();
 }
 
 class _MyPageState extends State<MyPage> {
-  bool _isProfilePublic = true; // 프로필 공개 여부 상태
+  //현재 보여줄 화면을 관리하는 상태 변수. null이면 기본 프로필 화면.
+  Widget? _currentDetailView;
+  bool _isProfilePublic = true;
+
+  //상세 페이지로 "내부 화면 전환"을 하는 함수
+  void _pushDetailView(Widget view) {
+    setState(() {
+      _currentDetailView = view;
+    });
+  }
 
   // 로그아웃 또는 탈퇴 시 팝업을 표시하는 함수
   void _showConfirmationDialog(String title, String content) {
@@ -30,11 +49,10 @@ class _MyPageState extends State<MyPage> {
               },
             ),
             TextButton(
-              // 실제 로직을 위해 색상을 다르게 줄 수 있음
               style: TextButton.styleFrom(foregroundColor: Colors.red),
               child: Text(title),
               onPressed: () {
-                // 여기에 실제 로그아웃 또는 탈퇴 로직을 추가
+                _authService.signOut();
                 print('$title 실행');
                 Navigator.of(context).pop(); // 팝업 닫기
               },
@@ -47,30 +65,69 @@ class _MyPageState extends State<MyPage> {
 
   @override
   Widget build(BuildContext context) {
-    // 화면 전체의 배경색을 이미지와 유사하게 설정
-    return Scaffold(
-      backgroundColor: Colors.grey[200],
-      appBar: AppBar(
+    return WillPopScope(
+      onWillPop: () async {
+        if (_currentDetailView != null) {
+          setState(() {
+            _currentDetailView = null;
+          });
+          return false; // 앱 종료 방지
+        }
+        return true; // 기본 프로필 화면에서는 앱 종료 허용 (또는 이전 화면으로 이동)
+      },
+      child: Scaffold(
+        backgroundColor: Colors.grey[200],
+        appBar: _buildAppBar(), // AppBar를 별도 함수로 분리
+        body: _buildBody(),     // Body를 별도 함수로 분리
+      ),
+    );
+  }
+
+  // [수정 4] 현재 상태에 맞는 AppBar를 반환하는 함수
+  AppBar _buildAppBar() {
+    if (_currentDetailView != null) {
+      // 1. 상세 페이지를 보여줄 때의 AppBar
+      // 상세 페이지 자체에 AppBar가 있으므로, MyPage의 AppBar는 숨기거나 최소화할 수 있음
+      // 여기서는 뒤로가기 버튼만 있는 간단한 AppBar를 제공
+      return AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            // AppBar의 뒤로가기 버튼을 누르면 기본 프로필 화면으로 복귀
+            setState(() {
+              _currentDetailView = null;
+            });
+          },
+        ),
+        // title: Text("설정"), // 필요하다면 제목 추가
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      );
+    } else {
+      // 2. 기본 마이페이지 화면일 때의 AppBar
+      return AppBar(
         leading: const Icon(Icons.person, size: 30),
         title: const Text('마이페이지'),
-        backgroundColor: Colors.blue, // 이미지의 상단 바 색상
+        backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: <Widget>[
-          // --- 1. 프로필 정보 섹션 ---
-          _buildProfileSection(),
-          const SizedBox(height: 12),
+        automaticallyImplyLeading: false, // 상위 페이지의 뒤로가기 버튼 자동 생성 방지
+      );
+    }
+  }
 
-          // --- 2. 완료한 목표 섹션 ---
-          _buildCompletedGoalsSection(),
-          const SizedBox(height: 12),
-
-          // --- 3. 설정 및 기타 섹션 ---
-          _buildSettingsSection(),
-        ],
-      ),
+  // [수정 5] 현재 상태에 맞는 Body를 반환하는 함수
+  Widget _buildBody() {
+    // _currentDetailView가 null이 아니면 상세 페이지 위젯을, null이면 기본 프로필 화면을 보여줌
+    return _currentDetailView ?? ListView(
+      padding: const EdgeInsets.all(16.0),
+      children: <Widget>[
+        _buildProfileSection(),
+        const SizedBox(height: 12),
+        _buildCompletedGoalsSection(),
+        const SizedBox(height: 12),
+        _buildSettingsSection(),
+      ],
     );
   }
 
@@ -107,7 +164,7 @@ class _MyPageState extends State<MyPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 등급 이미지 (실제 이미지 경로로 수정 필요)
-              Image.asset('assets/images/badge.png', width: 80, height: 80),
+              Image.asset('lib/assets/badge.png', width: 80, height: 80),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -165,12 +222,8 @@ class _MyPageState extends State<MyPage> {
           const Divider(height: 20),
           // 목표 데이터 분석
           InkWell(
-            onTap: () { /* 목표 데이터 분석 화면으로 이동 */
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context)=> chart()),
-              );},
-            child: Row(
+            onTap: () { /* 목표 데이터 분석 화면으로 이동 */ },
+            child: const Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('목표 데이터 분석', style: TextStyle(fontSize: 15)),
@@ -194,10 +247,8 @@ class _MyPageState extends State<MyPage> {
           _buildSettingsItem(
             text: '비밀번호 변경',
             onTap: () { /* 비밀번호 변경 화면으로 이동 */
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => PasswordChangePage()),
-              );},
+              _pushDetailView(PasswordChangePage());
+            },
           ),
           _buildSettingsItem(
             text: '프로필 공개',
@@ -214,21 +265,27 @@ class _MyPageState extends State<MyPage> {
           _buildSettingsItem(
             text: '목표 유형 설정',
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => MyApp()),
-              );
+              _pushDetailView(MyApp());
             },
           ),
           _buildSettingsItem(
             text: '알림 설정',
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => Notification1()),
-              );
+              _pushDetailView(Notification1());
             },
           ),
+
+          // [수정 2] '랭킹' 스위치 항목 추가
+          _buildSettingsItem(
+            text: '랭킹 보기', // 항목 이름
+            trailing: Switch(
+              value: widget.isRankingPublic,
+              // 스위치 값이 변경되면, 부모로부터 받은 onRankingChanged 함수를 호출합니다.
+              onChanged: widget.onRankingChanged,
+            ),
+            onTap: null, // 스위치 자체가 상호작용하므로 Row 전체의 탭은 비활성화
+          ),
+
           const Divider(height: 20),
           _buildSettingsItem(
             text: '로그아웃',
@@ -238,14 +295,14 @@ class _MyPageState extends State<MyPage> {
           _buildSettingsItem(
             text: '탈퇴',
             textColor: Colors.red,
-            onTap: () => _showConfirmationDialog('탈퇴', '정말로 탈퇴 하시겠습니까?'),
+            onTap: () => _showConfirmationDialog('탈퇴', '탈퇴 하시겠습니까?'),
           ),
         ],
       ),
     );
   }
 
-  // --- 보조 위젯들 (재사용을 위해 분리) ---
+  // ---
 
   // 각 섹션의 기본 컨테이너 스타일
   Widget _buildSectionContainer({required Widget child}) {
