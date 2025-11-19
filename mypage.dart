@@ -1,11 +1,10 @@
-//mypage.dart 마이페이지
 import 'package:flutter/material.dart';
-import 'package:calendar/component/GoalTypeSetting.dart';
-import 'package:calendar/component/NotificationSetting.dart';
-import 'package:calendar/component/PwChange.dart';
-import 'package:calendar/services/auth_service.dart';
+import 'package:pbl/tap/mypages/component/GoalTypeSetting.dart';
+import 'package:pbl/tap/mypages/component/NotificationSetting.dart';
+import 'package:pbl/tap/mypages/component/PwChange.dart';
+import 'package:pbl/tap/mypages/component/chart/showchart.dart';
+import 'package:pbl/const/colors.dart';
 
-final AuthService _authService = AuthService();
 
 class MyPage extends StatefulWidget {
   final bool isRankingPublic;
@@ -52,7 +51,6 @@ class _MyPageState extends State<MyPage> {
               style: TextButton.styleFrom(foregroundColor: Colors.red),
               child: Text(title),
               onPressed: () {
-                _authService.signOut();
                 print('$title 실행');
                 Navigator.of(context).pop(); // 팝업 닫기
               },
@@ -76,56 +74,36 @@ class _MyPageState extends State<MyPage> {
         return true; // 기본 프로필 화면에서는 앱 종료 허용 (또는 이전 화면으로 이동)
       },
       child: Scaffold(
-        backgroundColor: Colors.grey[200],
-        appBar: _buildAppBar(), // AppBar를 별도 함수로 분리
+        appBar: AppBar(
+          leading: const Icon(Icons.person, size: 30),
+          title: const Text("마이페이지",
+            style: TextStyle(
+              color: PRIMARY_COLOR,
+              fontSize: 20,
+              fontFamily: 'Pretendard-Regular',
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          toolbarHeight: 40.0,
+          backgroundColor: Colors.white,
+          elevation: 0,
+        ),
         body: _buildBody(),     // Body를 별도 함수로 분리
+        backgroundColor: Colors.grey[100],
       ),
     );
-  }
-
-  // [수정 4] 현재 상태에 맞는 AppBar를 반환하는 함수
-  AppBar _buildAppBar() {
-    if (_currentDetailView != null) {
-      // 1. 상세 페이지를 보여줄 때의 AppBar
-      // 상세 페이지 자체에 AppBar가 있으므로, MyPage의 AppBar는 숨기거나 최소화할 수 있음
-      // 여기서는 뒤로가기 버튼만 있는 간단한 AppBar를 제공
-      return AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            // AppBar의 뒤로가기 버튼을 누르면 기본 프로필 화면으로 복귀
-            setState(() {
-              _currentDetailView = null;
-            });
-          },
-        ),
-        // title: Text("설정"), // 필요하다면 제목 추가
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      );
-    } else {
-      // 2. 기본 마이페이지 화면일 때의 AppBar
-      return AppBar(
-        leading: const Icon(Icons.person, size: 30),
-        title: const Text('마이페이지'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        automaticallyImplyLeading: false, // 상위 페이지의 뒤로가기 버튼 자동 생성 방지
-      );
-    }
   }
 
   // [수정 5] 현재 상태에 맞는 Body를 반환하는 함수
   Widget _buildBody() {
     // _currentDetailView가 null이 아니면 상세 페이지 위젯을, null이면 기본 프로필 화면을 보여줌
     return _currentDetailView ?? ListView(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(0.0),
       children: <Widget>[
         _buildProfileSection(),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         _buildCompletedGoalsSection(),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         _buildSettingsSection(),
       ],
     );
@@ -142,7 +120,7 @@ class _MyPageState extends State<MyPage> {
             children: [
               const CircleAvatar(
                 radius: 20,
-                backgroundColor: Colors.blue,
+                backgroundColor: Colors.grey,
                 child: Icon(Icons.person, color: Colors.white),
               ),
               const SizedBox(width: 10),
@@ -164,7 +142,7 @@ class _MyPageState extends State<MyPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 등급 이미지 (실제 이미지 경로로 수정 필요)
-              Image.asset('lib/assets/badge.png', width: 80, height: 80),
+              Image.asset('assets/images/badge.png', width: 80, height: 80),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -180,7 +158,7 @@ class _MyPageState extends State<MyPage> {
                           child: LinearProgressIndicator(
                             value: 412 / 500,
                             backgroundColor: Colors.grey[300],
-                            valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+                            valueColor: const AlwaysStoppedAnimation<Color>(Colors.black54),
                           ),
                         ),
                       ],
@@ -209,7 +187,10 @@ class _MyPageState extends State<MyPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('완료한 목표', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const Text('완료한 목표',
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700,
+                    fontFamily: 'Pretendard-Bold',)),
               TextButton(
                 onPressed: () { /* 더보기 화면으로 이동 */ },
                 child: const Text('더보기', style: TextStyle(color: Colors.grey)),
@@ -221,16 +202,20 @@ class _MyPageState extends State<MyPage> {
           _buildGoalItem('PBL A+ 받기'),
           const Divider(height: 20),
           // 목표 데이터 분석
-          InkWell(
-            onTap: () { /* 목표 데이터 분석 화면으로 이동 */ },
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('목표 데이터 분석', style: TextStyle(fontSize: 15)),
-                Icon(Icons.chevron_right, color: Colors.grey),
-              ],
-            ),
-          )
+        InkWell(
+          onTap: () { /* 목표 데이터 분석 화면으로 이동 */
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context)=> chart()),
+            );},
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('목표 데이터 분석', style: TextStyle(fontSize: 15)),
+              Icon(Icons.chevron_right, color: Colors.grey),
+            ],
+          ),
+        ),
         ],
       ),
     );
@@ -247,41 +232,63 @@ class _MyPageState extends State<MyPage> {
           _buildSettingsItem(
             text: '비밀번호 변경',
             onTap: () { /* 비밀번호 변경 화면으로 이동 */
-              _pushDetailView(PasswordChangePage());
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context)=> PasswordChangePage()),
+              );
             },
           ),
           _buildSettingsItem(
             text: '프로필 공개',
-            trailing: Switch(
-              value: _isProfilePublic,
-              onChanged: (value) {
-                setState(() {
-                  _isProfilePublic = value;
-                });
-              },
+            trailing: Transform.scale(
+              scale: 0.9,
+              child: Switch(
+                value: _isProfilePublic,
+                onChanged: (value) {
+                  setState(() {
+                    _isProfilePublic = value;
+                  });
+                },
+                activeColor: Colors.black,
+                activeTrackColor: Colors.black54.withOpacity(0.5),
+                inactiveThumbColor: Colors.grey,
+                inactiveTrackColor: Colors.grey.withOpacity(0.3),
+              ),
             ),
             onTap: null, // Switch가 있으므로 Row 전체의 onTap은 비활성화
           ),
           _buildSettingsItem(
             text: '목표 유형 설정',
             onTap: () {
-              _pushDetailView(MyApp());
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context)=> GoalTypeSelectorPage()),
+              );
             },
           ),
           _buildSettingsItem(
             text: '알림 설정',
             onTap: () {
-              _pushDetailView(Notification1());
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context)=> NotificationSettingsPage()),
+              );
             },
           ),
 
           // [수정 2] '랭킹' 스위치 항목 추가
           _buildSettingsItem(
             text: '랭킹 보기', // 항목 이름
-            trailing: Switch(
-              value: widget.isRankingPublic,
-              // 스위치 값이 변경되면, 부모로부터 받은 onRankingChanged 함수를 호출합니다.
-              onChanged: widget.onRankingChanged,
+            trailing: Transform.scale(
+              scale: 0.9,
+              child: Switch(
+                value: widget.isRankingPublic,
+                onChanged: widget.onRankingChanged,
+                activeColor: Colors.black,
+                activeTrackColor: Colors.black54.withOpacity(0.5),
+                inactiveThumbColor: Colors.grey,
+                inactiveTrackColor: Colors.grey.withOpacity(0.3),
+              ),
             ),
             onTap: null, // 스위치 자체가 상호작용하므로 Row 전체의 탭은 비활성화
           ),
@@ -310,7 +317,7 @@ class _MyPageState extends State<MyPage> {
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12.0),
+        borderRadius: BorderRadius.circular(0.0),
       ),
       child: child,
     );
@@ -324,7 +331,7 @@ class _MyPageState extends State<MyPage> {
         color: Colors.grey[200],
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+      child: Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
     );
   }
 
@@ -334,7 +341,9 @@ class _MyPageState extends State<MyPage> {
       padding: const EdgeInsets.only(top: 8.0),
       child: Row(
         children: [
-          const Text('•', style: TextStyle(color: Colors.grey)),
+          const Text('•', style: TextStyle(
+            color: Colors.grey, fontFamily: 'Pretendard-Medium',
+            fontWeight: FontWeight.w700,)),
           const SizedBox(width: 8),
           Text(goal, style: const TextStyle(color: Colors.black87)),
         ],

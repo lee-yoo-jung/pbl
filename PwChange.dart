@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pbl/const/colors.dart';
 
 class PasswordChangePage extends StatefulWidget {
   const PasswordChangePage ({super.key});
@@ -188,7 +189,15 @@ class _PasswordChangePageState extends State<PasswordChangePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('비밀번호 변경'),
+        title: const Text('비밀번호 변경',
+          style: TextStyle(
+            color:PRIMARY_COLOR,
+            fontSize: 20,
+            fontFamily: 'Pretendard',
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        backgroundColor: Colors.white,
       ),
       body: SingleChildScrollView(    // 내용이 넘칠 경우 스크롤 가능하게 해줌
         padding: const EdgeInsets.all(24),
@@ -253,11 +262,4 @@ class _PasswordChangePageState extends State<PasswordChangePage> {
       ),
     );
   }
-}
-
-// 실행
-void main() {
-  runApp(const MaterialApp(
-    home: PasswordChangePage(),
-  ));
 }

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:calendar/component/mypage.dart';
+import 'package:pbl/const/colors.dart';
 
 const List<String> goalTypes = [
   '입시',
@@ -11,22 +11,6 @@ const List<String> goalTypes = [
   '취미',
   '기타',
 ];
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: '목표 유형 설정',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        fontFamily: 'Inter', // 폰트 지정
-        useMaterial3: false, // Material 2 테마 사용
-      ),
-      home: const GoalTypeSelectorPage(), // 시작 화면 지정
-    );
-  }
-}
 
 // 목표 유형 선택 화면을 나타내는 StatefulWidget
 class GoalTypeSelectorPage extends StatefulWidget {
@@ -118,8 +102,10 @@ class _GoalTypeSelectorPageState extends State<GoalTypeSelectorPage> {
         title: const Text(
           '목표 유형 설정',
           style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
+            color:PRIMARY_COLOR,
+            fontSize: 20,
+            fontFamily: 'Pretendard',
+            fontWeight: FontWeight.w700,
           ),
         ),
         backgroundColor: Colors.white,

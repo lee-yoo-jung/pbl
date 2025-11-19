@@ -1,33 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:calendar/component/mypage.dart';
-
-class Notification1 extends StatelessWidget {
-  Notification1({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: '알림 설정',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        fontFamily: 'Inter',
-        useMaterial3: false,
-        scaffoldBackgroundColor: Colors.grey.shade50,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          elevation: 1,
-          titleTextStyle: TextStyle(
-            color: Colors.black87,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-      home: const NotificationSettingsPage(),
-    );
-  }
-}
-
+import 'package:pbl/const/colors.dart';
 
 class NotificationSettingsPage extends StatefulWidget {
   const NotificationSettingsPage({super.key});
@@ -236,8 +208,17 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('알림 설정'),
+        title: const Text('알림 설정',
+          style: TextStyle(
+            color: PRIMARY_COLOR,
+            fontSize: 20,
+            fontFamily: 'Pretendard-Regular',
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         centerTitle: false, // 제목 왼쪽 정렬
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
       ),
       body: SingleChildScrollView( // 내용이 넘쳐도 스크롤 가능하도록
         padding: const EdgeInsets.all(16.0),

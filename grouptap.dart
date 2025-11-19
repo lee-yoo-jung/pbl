@@ -1,6 +1,7 @@
 //grouptap.dart  그룹 탭
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:pbl/const/colors.dart';
 
 // 세부 계획 데이터 모델
 class SubTask {
@@ -132,36 +133,11 @@ final List<Goal> mockGoals = [
 final Set<String> _globallyCompletedGoalsShown = <String>{};
 
 
-// 메인 앱 및 그룹 목표 리스트 페이지
-void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  initializeDateFormatting().then((_) {
-    runApp(const GoalTrackingApp());
-  });
-}
-
-class GoalTrackingApp extends StatelessWidget {
-  const GoalTrackingApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: '그룹 목표 달성 앱',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        fontFamily: 'Inter',
-        useMaterial3: true,
-      ),
-      home: const GroupGoalPage(),
-    );
-  }
-}
-
 class GroupGoalPage extends StatefulWidget {
   const GroupGoalPage({super.key});
 
   @override
-  State<GroupGoalPage> createState() => _GroupGoalPageState();
+  State<GroupGoalPage> createState()=>_GroupGoalPageState();
 }
 
 class _GroupGoalPageState extends State<GroupGoalPage> {
@@ -213,11 +189,19 @@ class _GroupGoalPageState extends State<GroupGoalPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[200],
       appBar: AppBar(
-        leading: const Icon(Icons.group, size: 30),
-        title: const Text('그룹'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
+        leading: const Icon(Icons.groups, size: 30),
+        title: const Text("그룹",
+          style: TextStyle(
+            color: PRIMARY_COLOR,
+            fontSize: 20,
+            fontFamily: 'Pretendard-Regular',
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        toolbarHeight: 40.0,
+        backgroundColor: Colors.white, // 이미지의 상단 바 색상
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -282,19 +266,21 @@ class GoalCard extends StatelessWidget {
       completionStatusWidget = Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         decoration: BoxDecoration(
-          color: Colors.green.shade50,
           borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: Colors.black54,
+          ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.check_circle_outline, color: Colors.green.shade700, size: 20),
+            Icon(Icons.check_circle_outline, color: Colors.blueGrey.shade700, size: 20),
             const SizedBox(width: 8),
             Text(
               "목표 완료됨",
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: Colors.green.shade700,
+                color: Colors.blueGrey.shade700,
               ),
             ),
           ],
@@ -304,78 +290,60 @@ class GoalCard extends StatelessWidget {
       completionStatusWidget = const SizedBox.shrink();
     }
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      elevation: 4,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 참가 인원 목록 (현재 사용자 제외한 친구 이름만 표시)
-              Text(
-                participantsList.isEmpty ? "나만 참여 중" : participantsList,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
-              ),
-              const SizedBox(height: 4),
-
-              // 목표 이름
-              Text(
-                goal.name,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              Row(
-                children: [
-                  // 목표 달성률 진행 바
-                  Expanded(
-                    child: LinearProgressIndicator(
-                      value: normalizedRate,
-                      backgroundColor: Colors.grey[300],
-                      color: isCompleted ? Colors.green : Colors.blueAccent,
-                      minHeight: 10,
-                      borderRadius: BorderRadius.circular(5),
-                    ),
+    return Column(
+     children: [
+       Container(
+         margin: const EdgeInsets.symmetric(vertical: 5.0,horizontal: 5),
+         decoration: BoxDecoration(
+           color: Colors.white,
+           borderRadius: BorderRadius.circular(5),
+         ),
+         child: InkWell(
+           onTap: onTap,
+           child: Padding(
+             padding: const EdgeInsets.all(25.0),
+             child: Column(
+               crossAxisAlignment: CrossAxisAlignment.start,
+               children: [
+             // 참가 인원 목록 (현재 사용자 제외한 친구 이름만 표시)
+             Text(
+             participantsList.isEmpty ? "나만 참여 중" : participantsList,
+               style: TextStyle(
+                 fontSize: 15,
+                 color: Colors.black54,
+                 fontFamily: 'Pretendard-Medium',
+                 fontWeight: FontWeight.w500,
+               ),
+             ),
+             const SizedBox(height: 5),
+            Row(
+              children: [// 목표 이름
+                Text(
+                  goal.name,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontFamily: 'Pretendard-Bold',
+                    fontWeight: FontWeight.w500,
                   ),
-                  const SizedBox(width: 12),
-
-                  // 달성률 텍스트
-                  Text(
-                    "${goal.completionPercentage}%",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: isCompleted ? Colors.green : Colors.blueAccent,
-                    ),
-                  ),
-                ],
-              ),
-
-              // 완료 상태 위젯 추가
-              if (isCompleted) ...[
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: completionStatusWidget,
                 ),
-              ]
+                const SizedBox(width: 70),
+              ],
+            ),
+
+            // 완료 상태 위젯 추가
+            if (isCompleted) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: completionStatusWidget,
+              ),
+            ]
             ],
-          ),
-        ),
-      ),
+             ),
+           ),
+         ),
+       ),
+     ],
     );
   }
 }
@@ -395,160 +363,201 @@ class GoalDetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          "개인 목표 달성률",
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-        ),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        elevation: 1,
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 목표 이름 헤더
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  goal.name,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                // 세부 계획 수 정보를 추가로 표시
-                Text(
-                  '총 세부 계획 수: ${goal.totalSubTasks}개',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.normal,
-                    color: Colors.grey,
-                  ),
-                ),
-              ],
+          backgroundColor: Colors.grey[100],
+          appBar: AppBar(
+            title: const Text(
+              "개인 목표 달성률",
+              style: TextStyle(
+                color: PRIMARY_COLOR,
+                fontSize: 20,
+                fontFamily: 'Pretendard-Regular',
+                fontWeight: FontWeight.w700,
+              ),
             ),
+            toolbarHeight: 60.0,
+            backgroundColor: Colors.white, // 이미지의 상단 바 색상
+
           ),
-
-          // 참가자 목록 (개인별 달성률 표시)
-          Expanded(
-            child: ListView.builder(
-              itemCount: goal.participants.length,
-              itemBuilder: (context, index) {
-                final userName = goal.participants[index];
-                final bool isCurrentUser = userName == currentUser;
-
-                // 개인이 완료한 세부 계획 수
-                final completedCount = goal.getIndividualCompletedCount(userName);
-                // 개별 달성률 퍼센트
-                final percentage = goal.getIndividualCompletionPercentage(userName);
-                final normalizedRate = percentage / 100.0;
-
-                return Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16.0, vertical: 8.0),
-                  child: Card(
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.person_pin, size: 36,
-                              color: Colors.blueGrey),
-                          const SizedBox(width: 12),
-
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  userName, // 닉네임
-                                  style: const TextStyle(fontSize: 16,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 4),
-                                // 완료된 세부 계획 수 표시
-                                Text(
-                                  '완료: $completedCount / ${goal.totalSubTasks}개',
-                                  style: const TextStyle(fontSize: 12,
-                                      color: Colors.blueGrey),
-                                ),
-                                const SizedBox(height: 4),
-
-                                // 달성률 진행 바와 텍스트
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      flex: 3,
-                                      child: LinearProgressIndicator(
-                                        value: normalizedRate,
-                                        backgroundColor: Colors.grey[200],
-                                        color: percentage >= 100
-                                            ? Colors.green
-                                            : Colors.blueAccent,
-                                        minHeight: 8,
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    // 달성률 텍스트
-                                    Expanded(
-                                      flex: 1,
-                                      child: Text(
-                                        "$percentage%",
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                          color: percentage >= 100 ? Colors
-                                              .green : Colors.blueAccent,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-
-                          // 독촉하기 버튼
-                          // isCurrentUser 변수를 사용하여 현재 사용자가 아닐 때만 버튼을 표시
-                          if (!isCurrentUser)
-                            ElevatedButton(
-                              onPressed: () => _nudge(userName, completedCount, goal.totalSubTasks),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red.shade400,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 8),
-                                elevation: 3,
-                              ),
-                              child: const Text(
-                                "독촉하기",
-                                style: TextStyle(
-                                    fontSize: 14, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                        ],
+          body: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 목표 이름 헤더
+              Padding(
+                padding: const EdgeInsets.all(30.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Text(
+                        goal.name,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontFamily: 'Pretendard-SemiBold',
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black87,
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
-            ),
+                    const SizedBox(height: 30),
+                    // 세부 계획 수 정보를 추가로 표시
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Tooltip(
+                            preferBelow: false,
+                            verticalOffset: -70,
+                            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+                            triggerMode: TooltipTriggerMode.tap,
+                            decoration: BoxDecoration(
+                              color: Colors.grey,
+                              borderRadius: const BorderRadius.all(Radius.circular(10)),
+                            ),
+                            message: "그룹내 팀원의 달성률에 따른 그룹 차등 보상 \n 세부 게획 수에 따른 경험치 설명",
+                            textStyle: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white,
+                            ),
+                            child: Icon(
+                              Icons.info_rounded,
+                              size: 16,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          SizedBox(width: 10,),
+                          Text(
+                            '참가 중인 인원: ${goal.participants.length}명',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontFamily: 'Pretendard-Medium',
+                              fontWeight: FontWeight.w500,
+                              color: Colors.black54,
+                            ),
+                          ),
+                        ],
+                      )
+
+                    )
+                  ],
+                ),
+              ),
+
+              // 참가자 목록 (개인별 달성률 표시)
+              Expanded(
+                child: ListView.builder(
+                  itemCount: goal.participants.length,
+                  itemBuilder: (context, index) {
+                    final userName = goal.participants[index];
+                    final bool isCurrentUser = userName == currentUser;
+
+                    // 개인이 완료한 세부 계획 수
+                    final completedCount = goal.getIndividualCompletedCount(userName);
+                    // 개별 달성률 퍼센트
+                    final percentage = goal.getIndividualCompletionPercentage(userName);
+                    final normalizedRate = percentage / 100.0;
+
+                    return Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0, vertical: 8.0),
+                        child: Column(
+                          children: [
+                            Divider(
+                              color: Colors.grey.shade300, // 선 색상
+                              height: 20,         // 위젯의 높이
+                              thickness: 1,       // 선의 실제 두께
+                              indent: 10,         // 시작 지점
+                              endIndent: 10,      // 끝 지점
+                            ),
+                            Container(
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.person_pin, size: 36,
+                                        color: Colors.grey),
+                                    const SizedBox(width: 12),
+
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            userName, // 닉네임
+                                            style: const TextStyle(fontSize: 16,
+                                                fontWeight: FontWeight.bold),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          // 완료된 세부 계획 수 표시
+                                          Text(
+                                            '완료: $completedCount / ${goal.totalSubTasks}개',
+                                            style: const TextStyle(fontSize: 12,
+                                                color: Colors.blueGrey),
+                                          ),
+                                          const SizedBox(height: 4),
+
+                                          // 달성률 진행 바와 텍스트
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                flex: 3,
+                                                child: Text('최근 수행한 계획 or \n 수행할 계획')
+                                              ),
+                                              const SizedBox(width: 8),
+                                              // 달성률 텍스트
+                                              Expanded(
+                                                flex: 1,
+                                                child:Text( percentage==100?
+                                                  "$percentage%": "",
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: percentage >= 100 ? Colors
+                                                        .black87 : Colors.grey[700],
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+
+                                    // 독촉하기 버튼
+                                    // isCurrentUser 변수를 사용하여 현재 사용자가 아닐 때+달성률이 100(목표완료)가 아닐때 버튼을 표시
+                                    if (!isCurrentUser&&percentage!=100)
+                                      ElevatedButton(
+                                        onPressed: () => _nudge(userName, completedCount, goal.totalSubTasks),
+                                        style: ElevatedButton.styleFrom(
+                                          foregroundColor: Colors.red,
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(3),
+                                              side: BorderSide(color: Colors.red)
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 8),
+                                        ),
+                                        child: const Text(
+                                          "독촉하기",
+                                          style: TextStyle(
+                                            fontSize: 14, fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 }
