@@ -47,7 +47,10 @@ dependencies:
   flutter_dotenv: ^6.0.0
   flutter_colorpicker: ^1.1.0
   syncfusion_flutter_charts: ^26.2.14
-  image_picker: ^1.2.0
+  #로컬 알림 패키지 3개 추가
+  flutter_local_notifications: ^17.0.0
+  permission_handler: ^11.1.0
+  timezone: ^0.9.4
 
 dev_dependencies:
   flutter_test:

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pbl/const/colors.dart';
+import 'package:pbl/tap//mypages/component/notification_service.dart'; // 알림 서비스 import 추가
 
 class NotificationSettingsPage extends StatefulWidget {
   const NotificationSettingsPage({super.key});
@@ -31,6 +32,20 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
     '40분전', '50분전', '1시간전'
   ];
   String _detailedGoalTimeBefore = '10분전';
+
+  // '10분전' -> 10, '1시간전' -> 60 으로 변환함.
+  int _parseMinutesBefore(String timeString) {
+    if (timeString.contains('시간')) {
+      // '1시간전' -> 숫자만 추출 (1) * 60
+      String numberStr = timeString.replaceAll(RegExp(r'[^0-9]'), '');
+      return int.parse(numberStr) * 60;
+    } else {
+      // '10분전' -> 숫자만 추출 (10)
+      String numberStr = timeString.replaceAll(RegExp(r'[^0-9]'), '');
+      return int.parse(numberStr);
+    }
+  }
+
 
   // 알림 메시지 표시
   void _showSuccessNotification(String message) {
@@ -290,26 +305,71 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
+                onPressed: () async { // async 추가
                   // 저장 로직 및 성공 알림 실행
                   final message = '저장되었습니다.';
 
+                  // 기존 알림 취소 (재설정)
+                  final notificationService = NotificationService();
+                  await notificationService.cancelNotification(0); // ID 0번: 큰 목표 알림용
+
+                  // 큰 목표 알림 켜짐: 예약
+                  if (_majorGoalEnabled) {
+                    // 시각 결정
+                    int targetHour = _majorGoalHour;
+
+                    await notificationService.scheduleMajorGoalNotification(
+                      id: 0, // 고유 ID, 큰 목표 알림 ID: 0
+                      title: "큰 목표 알림",
+                      body: "$_majorGoalDay ${_majorGoalHour}시에 설정된 알림이 있습니다. 목표를 확인하세요.",
+                      hour: targetHour,
+                    );
+                    debugPrint('알림 예약 완료: ${_majorGoalHour}시');
+                  } else {
+                    debugPrint('큰 목표 알림 OFF');
+                  }
+
+
+                  //세부 목표 알림 처리 (ID: 1)
+                  await notificationService.cancelNotification(1); // 기존 세부 알림 취소
+
+
+                  if (_detailedGoalEnabled) {
+                    // 선택한 시간 문자열을 숫자로 변환 (예: '10분전' -> 10)
+                    int minutesBefore = _parseMinutesBefore(_detailedGoalTimeBefore);
+
+                    // 임의로 "오후 2시 00분"을 목표 시간으로 가정(나중에 변경)
+                    int targetHour = 14;
+                    int targetMinute = 0;
+
+                    await notificationService.scheduleDetailedGoalNotification(
+                      id: 1, // 세부목표 ID: 1번
+                      title: "세부 목표 알림",
+                      body: "목표 시간 $_detailedGoalTimeBefore입니다!",
+                      minutesBefore: minutesBefore,
+                      goalHour: targetHour,   // 실제 목표 시간 변수
+                      goalMinute: targetMinute, // 실제 목표 분 변수
+                    );
+                    debugPrint('세부 알림 예약: $targetHour시 $targetMinute분의 $minutesBefore분 전');
+                  }
+
+                  // 성공 메시지 표시
+                  _showSuccessNotification(message);
+
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                  }
+
+
+
+                  /*
                   // 디버그 콘솔에 현재 설정 값 출력
                   debugPrint('큰 목표 알림: $_majorGoalEnabled, 시점: $_majorGoalDay ${_majorGoalHour}시');
                   debugPrint('세부 목표 알림: $_detailedGoalEnabled, 시점: $_detailedGoalTimeBefore');
 
                   _showSuccessNotification(message); // 성공 알림 함수 호출
-
-                  // 데이터베이스에 실제 설정 값 저장 로직 추가
-
-                  /*
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => MyPage()),
-                  );
                   */
 
-                  Navigator.pop(context);
 
                 },
                 style: ElevatedButton.styleFrom(
