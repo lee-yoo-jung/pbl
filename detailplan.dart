@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:calendar_scheduler/component/custom_text_field.dart';
-import 'package:calendar_scheduler/const/colors.dart';
-import 'package:calendar_scheduler/component/event.dart';
+import 'package:pbl/tap/calender/component/custom_text_field.dart';
+import 'package:pbl/const/colors.dart';
+import 'package:pbl/tap/calender/component/event.dart';
+import 'package:pbl/const/TimePicker.dart';
+
 
 //<계획의 시간과 내용을 입력하는 페이지>
 
@@ -34,33 +36,35 @@ class _Detailplan extends State<Detailplan> {
     selectedDate = widget.initialDate;  //부모 StatefulWidget로 전달받은 값을 선택한 날짜에 넣기
   }
 
-  //DateTime타입을 통일된 형식으로 설정 YYYY-MM-DD
+  //DateTime타입을 통일된 형식으로 설정 YYYY.MM.DD
   String _formatDate(DateTime date) =>
       "${date.year}-${date.month.toString().padLeft(2,'0')}-${date.day.toString().padLeft(2,'0')}";
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-
-      //상단 앱바
-      appBar: AppBar(
-        title: const Text("상세 계획"),
-        backgroundColor: PRIMARY_COLOR,
-        toolbarHeight: 45.0,
-      ),
+    return AlertDialog(
+      backgroundColor: Colors.white,
 
       //Child을 스크롤할 수 있게 함
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),  //페이지와 이 요소의 여백
+      content: SingleChildScrollView(
+        padding: const EdgeInsets.all(25),  //페이지와 이 요소의 여백
 
         //날짜 배치와 시간 설정, 계획 텍스트, 저장 버튼을 세로로 배치
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch, //가로로 각 요소를 늘리기,
 
-          children: [
-            Text("날짜:, "+_formatDate(selectedDate!)), //선택한 날짜 표시= 계획을 추가할 날짜
 
-            const SizedBox(height: 8),  //날짜와 시간 설정의 간격
+          children: [
+            Text("날짜: "+_formatDate(selectedDate!),
+              style: TextStyle(
+                color: PRIMARY_COLOR,
+                fontSize: 15,
+                fontFamily: 'Pretendard',
+                fontWeight: FontWeight.w600,
+              ),
+            ), //선택한 날짜 표시 = 계획을 추가할 날짜
+
+            const SizedBox(height: 20),  //날짜와 시간 설정의 간격
 
             //시간 설정
             SizedBox(
@@ -72,21 +76,19 @@ class _Detailplan extends State<Detailplan> {
                 readOnly: true,                   //입력할 수 없게
                 controller: startTimeController,  //설정한 시간(텍스트)을 읽을 수 있게
 
-                onTap: () async {   //눌렀을 때. 시간 다이얼로그 (showTimePicker)을 실행하고, TimeOfDay 타입의 picked에 저장
-                  final picked = await showTimePicker(
-                    context: context,
-                    initialTime: TimeOfDay.now(), //기본 시간: 현재 시간
-                  );
-                  //picked가 비어있지 않으면, 텍스트를 읽는 곳에 picked의 시각(HH:MM)을 입력하기
-                  if (picked != null) {
-                    startTimeController.text =
-                    "${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}";
+                onTap: () async {   //눌렀을 때. 시간 다이얼로그 (showTimeWheelPicker)을 실행하고, String 타입의 pickedTime에 저장
+                  // showTimePicker 대신 showTimeWheelPicker 사용
+                  final pickedTime = await showTimeWheelPicker(context);
+
+                  //pickedTime이 비어있지 않으면, 텍스트를 읽는 곳에 pickedTime의 시각(HH:MM)을 입력하기
+                  if (pickedTime != null) {
+                    startTimeController.text = pickedTime;
                   }
                 },
               ),
             ),
 
-            const SizedBox(height: 8),  //시간 다이얼로그와 계획을 적는 필드의 간격 설정
+            const SizedBox(height: 20),  //시간 다이얼로그와 계획을 적는 필드의 간격 설정
 
             //계획을 적는 필드
             SizedBox(
@@ -104,7 +106,14 @@ class _Detailplan extends State<Detailplan> {
             ElevatedButton(
               onPressed: savePlan, //눌렀을 때 savePlan 함수가 실행하기
               style: ElevatedButton.styleFrom(foregroundColor: PRIMARY_COLOR),
-              child: const Text("저장"),
+              child: const Text("저장",
+                style: TextStyle(
+                  color: PRIMARY_COLOR,
+                  fontSize: 15,
+                  fontFamily: 'Pretendard',
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
           ],
         ),

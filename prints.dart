@@ -1,8 +1,8 @@
-import 'package:pbl_mid/const/colors.dart';
+import 'package:pbl/const/colors.dart';
 import 'package:flutter/material.dart';
-import 'package:pbl_mid/tap/calender/component/event.dart';
-import 'package:pbl_mid/tap/calender/component/detailplan.dart';
-import 'package:pbl_mid/tap/calender/component/schedule_bottom_sheet.dart';
+import 'package:pbl/tap/calender/component/event.dart';
+import 'package:pbl/tap/calender/component/detailplan.dart';
+import 'package:pbl/tap/calender/component/schedule_bottom_sheet.dart';
 
 /*<이벤트와 이벤트 속 계획 리스트를 출력>
 <이벤트 삭제와 계획 추가/삭제를 할 수 있는 로직>*/
@@ -56,12 +56,17 @@ class PrintsState extends State<Prints>{
           itemBuilder: (context,index){
             if (index == 0) {
               // 스크롤 핸들
-              return Container(
-                margin: EdgeInsets.symmetric(horizontal: 185, vertical: 7),
-                height: 5,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(5),
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 15.0), // 상하 여백 추가
+                child: Center(
+                  child: Container(
+                    width: 40,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                  ),
                 ),
               );
             }
@@ -72,14 +77,11 @@ class PrintsState extends State<Prints>{
             return GestureDetector(
               onTap: () async {
                 //새 페이지에서 반환되는 값은 Plan객체로 updatedPlan에 저장됨
-                final updatedPlan = await Navigator.push<Plan>(
-                  context,
+                final updatedPlan = await showDialog<Plan>(
+                  context: context,
                   //지정된 이벤트와 선택된 날짜를 Datailplan 페이지로 이동
-                  MaterialPageRoute(
-                    builder: (context) => Detailplan(
-                        event: event,
-                        initialDate:widget.selectedDate),
-                  ),
+                  barrierDismissible: true, //배경탭 시, 닫기
+                  builder: (_)=> Detailplan(event: event, initialDate: widget.selectedDate),
                 );
                 //반환된 updatedPlan이 null이 아니라면, 지정된 이벤트와 계획을 전달=추가
                 if (updatedPlan != null) {
@@ -94,18 +96,92 @@ class PrintsState extends State<Prints>{
                   builder: (BuildContext context){
                     //목표 삭제 여부 확인
                     return AlertDialog(
-                      title: const Text('목표 삭제'),
-                      content: const Text('이 목표를 삭제하시겠습니까?'),
+                      backgroundColor: Colors.white,
+                      actionsAlignment: MainAxisAlignment.center,
+                      icon: Icon(
+                        Icons.warning_rounded,
+                        color: Colors.red[700],
+                        shadows: [
+                          Shadow(
+                            blurRadius: 8.0,
+                            color: Colors.black45,
+                            offset: Offset(2, 4),
+                          ),
+                        ],
+                      ),
+                      title: const Text(
+                        '목표 삭제',
+                        style: TextStyle(
+                          fontFamily: "Pretendard",
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black87,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      content: Text.rich(
+                        TextSpan(
+                          children: <TextSpan>[
+                            TextSpan(
+                              text: '목표를 영구히 삭제하시겠습니까?\n',
+                              style: TextStyle(
+                                fontFamily: "Pretendard",
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            TextSpan(
+                              text: '삭제된 목표는 되돌리거나\n복구할 수 없습니다.',
+                              style: TextStyle(
+                                fontFamily: "Pretendard",
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.red,
+                              ),
+                            ),
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+
                       actions: [
                         //그냥 닫기
-                        TextButton(onPressed: (){Navigator.of(context).pop();
-                        }, child: const Text('취소'),
+                        ElevatedButton(
+                          onPressed: (){ Navigator.of(context).pop(); },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey[400],
+                            foregroundColor: Colors.black87,
+                            elevation: 2,
+                          ),
+                          child: const Text(
+                            '삭제 취소',
+                            style: TextStyle(
+                              fontFamily: 'Pretendard',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
                         ),
                         //목표 삭제 후, 다이얼로그 닫기
-                        TextButton(onPressed: (){
-                          widget.adddel(event, removeEvent: true);
-                          Navigator.of(context).pop();
-                        }, child: const Text('확인'),
+                        ElevatedButton(
+                          onPressed: () {
+                            widget.adddel(event, removeEvent: true);
+                            Navigator.of(context).pop();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red[500],
+                            foregroundColor: Colors.white,
+                            elevation: 4,
+                          ),
+                          child: const Text(
+                            '목표 삭제', // 명확한 텍스트
+                            style: TextStyle(
+                              fontFamily: 'Pretendard',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
                         ),
                       ],
                     );
@@ -119,7 +195,7 @@ class PrintsState extends State<Prints>{
                 margin: EdgeInsets.symmetric(horizontal: 10.0, vertical: 17.0), //컨테이너의 테두리와 화면의 여백 설정
                 padding: EdgeInsets.all(5.0),                                   //컨테이너의 테두리와 내용의 여백 설정
                 decoration: BoxDecoration(
-                    color: Colors.transparent,
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(10)
                 ),
 
@@ -139,18 +215,7 @@ class PrintsState extends State<Prints>{
                               fontFamily: 'Pretendard',
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
-                              color: Colors.white
-                          ),
-                          softWrap: true, //자동 줄바꿈
-                        ),
-                        Text( //해시태그 있으면 추가
-                          (event.hashtags.isEmpty) ?
-                          "": "#${event.hashtags}",
-                          style: TextStyle(
-                              fontFamily: 'Pretendard',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w400,
-                              color: Colors.white
+                              color: Colors.black
                           ),
                           softWrap: true, //자동 줄바꿈
                         ),
@@ -161,7 +226,7 @@ class PrintsState extends State<Prints>{
                               fontFamily: 'Pretendard',
                               fontSize: 14,
                               fontWeight: FontWeight.w400,
-                              color: Colors.white
+                              color: Colors.black
                           ),
                           softWrap: true, //자동 줄바꿈
                         ),
@@ -171,7 +236,7 @@ class PrintsState extends State<Prints>{
                               fontFamily: 'Pretendard',
                               fontSize: 12,
                               fontWeight: FontWeight.w400,
-                              color: Colors.white
+                              color: Colors.black
                           ),
                         ),
                       ],
@@ -190,8 +255,8 @@ class PrintsState extends State<Prints>{
                         //계획의 날짜와 시간을 "YYYY-MM-DD"(dateStr)와 "HH:MM"(timeStr)로 바꾸기
                             .map((plan) {
                           checked.putIfAbsent(plan, ()=>false); //초기값은 false
-                          final dateStr =
-                              "${plan.selectdate.year}-${plan.selectdate.month.toString().padLeft(2, '0')}-${plan.selectdate.day.toString().padLeft(2, '0')}";
+                          //final dateStr =
+                          //"${${plan.selectdate.year}-plan.selectdate.month.toString().padLeft(2, '0')}-${plan.selectdate.day.toString().padLeft(2, '0')}";
                           final timeStr =
                               "${plan.selectdate.hour.toString().padLeft(2, '0')}:${plan.selectdate.minute.toString().padLeft(2, '0')}";
 
@@ -229,21 +294,25 @@ class PrintsState extends State<Prints>{
                                         },
                                       );
                                     },
-
                                     //계획 컨테이너
                                     child: Container(
+
                                       width: 300,
                                       height: 31,
                                       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5), // 안쪽 여백
                                       decoration: BoxDecoration(
                                         //체크박스에 체크가 되면 회색, 체크가 안되면 흰색
-                                        color: widget.checked[plan]??false ? Colors.grey.withOpacity(0.2): Colors.white ,          // 배경색
-                                        border: Border.all(color: Colors.transparent),                                         // 테두리 투명
-                                        borderRadius: BorderRadius.circular(8),  // 모서리 둥글게
+                                        color: widget.checked[plan]??false ? DARK_BLUE: Colors.white ,          // 배경색
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: DARK_BLUE.withOpacity(0.3),
+                                          width: 1,
+                                        ),
                                       ),
 
                                       child: Text(
-                                        "$dateStr $timeStr | ${plan.text}",
+                                        //"$dateStr $timeStr | ${plan.text}",
+                                        "$timeStr | ${plan.text}",
                                         style: TextStyle(
                                             fontFamily: 'Pretendard',
                                             fontSize: 15,
@@ -257,9 +326,10 @@ class PrintsState extends State<Prints>{
 
                                   //체크박스
                                   Transform.scale(    //크기 조정
-                                    scale:1.5,
+                                    scale:1.6,
                                     child: Checkbox(
                                       value: widget.checked[plan]??false,
+
                                       onChanged: (tf) {
                                         if(tf==true){
                                           showDialog(
@@ -277,9 +347,9 @@ class PrintsState extends State<Prints>{
                                                 }, child: const Text('확인'),
                                                 ),
 
-                                                //그냥 닫기
+                                                // 그냥 닫기
                                                 TextButton(onPressed: (){
-                                                  //자동으로 체크를 해제하기
+                                                  // 자동으로 체크를 해제하기
                                                   setState(() {
                                                     widget.checked[plan]=false;
                                                   });
@@ -297,9 +367,9 @@ class PrintsState extends State<Prints>{
                                         borderRadius: BorderRadius.circular(5),
                                       ),
                                       //테두리 색/두께
-                                      side: const BorderSide(
-                                        color: Colors.transparent, // 테두리 투명
-                                        width: 1,
+                                      side: BorderSide(
+                                        color: DARK_BLUE.withOpacity(0.3),
+                                        width: 0.7,
                                       ),
 
                                       fillColor: MaterialStateProperty.resolveWith<Color>(

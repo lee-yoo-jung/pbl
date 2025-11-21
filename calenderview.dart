@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:pbl_mid/tap/calender/component/main_calender.dart';
-import 'package:pbl_mid/tap/calender/component/schedule_bottom_sheet.dart';
-import 'package:pbl_mid/tap/calender/component/prints.dart';
-import 'package:pbl_mid/const/colors.dart';
-import 'package:pbl_mid/tap/calender/component/event.dart';
+import 'package:pbl/tap/calender/component/main_calender.dart';
+import 'package:pbl/tap/calender/component/schedule_bottom_sheet.dart';
+import 'package:pbl/tap/calender/component/prints.dart';
+import 'package:pbl/const/colors.dart';
+import 'package:pbl/tap/calender/component/event.dart';
 
 //<메인 화면(캘린더) 구상>
 
@@ -58,6 +58,7 @@ class _CalenderviewState extends State<Calenderview>{
 
   @override
   Widget build(BuildContext context) {
+
     final TogetherGoals=eventsList.where((goal)=> (goal.togeter?.isNotEmpty?? false)).toList();
     final SingleGoals=eventsList.where((goal)=> !(goal.togeter?.isNotEmpty?? false)).toList();
 
@@ -66,53 +67,59 @@ class _CalenderviewState extends State<Calenderview>{
     final AllGoalsMap=generateGoals(eventsList);
 
     return DefaultTabController(
-        length: 3,
-        child: Scaffold(  //상단 앱바
-          appBar: AppBar(
+      length: 3,
+      child: Scaffold(  //상단 앱바
+        appBar: AppBar(
           backgroundColor: Colors.white,
           //가로로 배치
           title: Row(
             children: [
-              Text("내캘린더",
-              style: TextStyle(
-                color: PRIMARY_COLOR,
-                fontSize: 20,
-                fontFamily: 'Pretendard',
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            Spacer(),
-            IconButton(
-              onPressed: null,
-              icon: Icon(Icons.notifications,
-                size: 25,
+              Icon(
+                Icons.calendar_month_rounded,
                 color: PRIMARY_COLOR,
               ),
-            ),
-          ],
-        ),
-        toolbarHeight: 40.0,  //앱바의 높이 지정
-        bottom: PreferredSize(
+              SizedBox(width: 8),
+              Text(
+                "내캘린더",
+                style: TextStyle(
+                  color: PRIMARY_COLOR,
+                  fontSize: 20,
+                  fontFamily: 'Pretendard',
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Spacer(),
+              IconButton(
+                onPressed: null,
+                icon: Icon(Icons.notifications,
+                  size: 25,
+                  color: POINT_COLOR,
+                ),
+              ),
+            ],
+          ),
+          toolbarHeight: 40.0,  //앱바의 높이 지정
+          bottom: PreferredSize(
             preferredSize: const Size.fromHeight(kToolbarHeight),
             child: Container(
-            color: Colors.white,
-            child: const TabBar(
-            tabs: [
-            Tab(text: '개인'),
-            Tab(text: '개인 & 공동'),
-            Tab(text: '공동'),
-            ],
-          labelColor: Colors.black ,  //선택된 탭의 글 색상
-          unselectedLabelColor: Colors.grey,  //선택되지 않은 탭의 글 색상
-          indicatorColor: Colors.black, //선택된 탭 아래 막대 색상
-          indicatorWeight: 2.5, //선택된 탭 아래 막대의 높이
-            indicatorSize: TabBarIndicatorSize.label, //선택된 탭 아래 막대의 너비: 해당 탭의 글자의 너비에 맞게
+              color: Colors.white,
+              child: const TabBar(
+                tabs: [
+                  Tab(text: '개인'),
+                  Tab(text: '개인 & 공동'),
+                  Tab(text: '공동'),
+                ],
+                labelColor: Colors.black ,  //선택된 탭의 글 색상
+                unselectedLabelColor: Colors.grey,  //선택되지 않은 탭의 글 색상
+                indicatorColor: Colors.black, //선택된 탭 아래 막대 색상
+                indicatorWeight: 2.5, //선택된 탭 아래 막대의 높이
+                indicatorSize: TabBarIndicatorSize.label, //선택된 탭 아래 막대의 너비: 해당 탭의 글자의 너비에 맞게
+              ),
+            ),
           ),
         ),
-      ),
-    ),
 
-      body: SafeArea(
+        body: SafeArea(
           child: TabBarView(
             children: [
               Calendar(SingleGoals, SingleGoalsMap),      //개인 캘린더
@@ -120,46 +127,42 @@ class _CalenderviewState extends State<Calenderview>{
               Calendar(TogetherGoals, TogetherGoalsMap),  //공동 캘린더
             ],
           ),
-      ),
+        ),
 
-      //이벤트(목표) 추가 버튼
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: SizedBox(
-          width: 45,
-          height: 45,
-          child:FloatingActionButton(
-            backgroundColor: PRIMARY_COLOR,
-            onPressed: () async{
-              // 목표 설정에서 반환되는 값은 Event객체로 newGoal에 저장됨
-              final newGoal= await showDialog<Event>(
-                  context: context,                         //빌드할 컨텐츠
-                  barrierDismissible: true,                 //배경 탭했을 때 BottomSheet 닫기
-                  builder: (_) => AlertDialog(
-                    content: ScheduleBottomSheet(),    //ScheduleBottomSheet 페이지 팝업 형식으로 빌드
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)), // 모서리 둥글게
-                    backgroundColor: Colors.white,
-                  )
-              );
+        //이벤트(목표) 추가 버튼
+        floatingActionButton: Padding(
+          padding: const EdgeInsets.only(bottom: 70),
+          child: SizedBox(
+            width: 45,
+            height: 45,
+            child:FloatingActionButton(
+              backgroundColor: PRIMARY_COLOR,
+              onPressed: () async{
+                // 목표 설정에서 반환되는 값은 Event객체로 newGoal에 저장됨
+                final newGoal= await showModalBottomSheet<Event>(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (context) => ScheduleBottomSheet(), // 기존 바텀시트 위젯
+                );
+                //위의 newGoal에 값이 있다면, Event 객체 리스트의 이벤트에 추가한 뒤, 재생성
+                if(newGoal!=null){
+                  setState(() {
+                    eventsList.add(newGoal);
+                    generateGoals(eventsList);
+                  });
+                }
+              },
+              shape: const CircleBorder(),  //둥근 모양
 
-              //위의 newGoal에 값이 있다면, Event 객체 리스트의 이벤트에 추가한 뒤, 재생성
-              if(newGoal!=null){
-                setState(() {
-                  eventsList.add(newGoal);
-                  generateGoals(eventsList);
-                });
-              }
-            },
-            shape: const CircleBorder(),  //둥근 모양
-
-            //이벤트(목표) 추가 버튼의 아이콘
-            child: Icon(
-              Icons.add,
-              color: Colors.white,
+              //이벤트(목표) 추가 버튼의 아이콘
+              child: Icon(
+                Icons.add,
+                color: Colors.white,
+              ),
             ),
           ),
         ),
-      ),),
+      ),
     );
   }
 
@@ -185,7 +188,7 @@ class _CalenderviewState extends State<Calenderview>{
               child: DraggableScrollableSheet(
                 initialChildSize: 0.1,  //화면의 초기 크기
                 minChildSize: 0.1,      //최소 크기
-                maxChildSize: 0.8,        //최대 크기
+                maxChildSize: 0.9,        //최대 크기
                 builder: (context,scrollController)=>Prints(
                   selectedDate: selectedDate,           //선택된 날짜
                   eventsMap: map,                 //날짜 별로 이벤트를 저장한 저장소
