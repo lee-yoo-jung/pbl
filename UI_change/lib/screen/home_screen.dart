@@ -76,8 +76,8 @@ class _MainScreenState extends State<MainScreen> {
       buttonBackgroundColor: POINT_COLOR, // 선택된 버튼 색상
       color: PRIMARY_COLOR, // 하단바 색상
 
-      animationDuration: const Duration(milliseconds: 150),
-      animationCurve: Curves.bounceInOut,
+      animationDuration: const Duration(milliseconds: 300),
+      animationCurve: Curves.easeInOut,
 
       onTap: _onItemTapped,
       items: items,
