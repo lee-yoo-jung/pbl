@@ -31,6 +31,7 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
       // Dialog 디자인
       contentPadding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
+      backgroundColor: Colors.white,
 
       content: SingleChildScrollView(
         child: Column(

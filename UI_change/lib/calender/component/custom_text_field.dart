@@ -34,17 +34,18 @@ class CustomTextField extends StatelessWidget{
             fontWeight: FontWeight.w700,
           ),
         ),
-        Expanded(
+        SizedBox(
           //TextField의 속성을 지정
+          height: 80,
           child: TextField(
             controller: controller,
             readOnly: readOnly,
             onTap: onTap,
             decoration: InputDecoration(
               border: const OutlineInputBorder(),
-            ),),
+            ),
+          ),
         ),
-
       ],
     );
   }

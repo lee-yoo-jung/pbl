@@ -111,22 +111,22 @@ class _CalenderviewState extends State<Calenderview>{
                 ],
                 labelColor: Colors.black ,  //선택된 탭의 글 색상
                 unselectedLabelColor: Colors.grey,  //선택되지 않은 탭의 글 색상
-                indicatorColor: Colors.black, //선택된 탭 아래 막대 색상
+                indicatorColor: PRIMARY_COLOR, //선택된 탭 아래 막대 색상
                 indicatorWeight: 2.5, //선택된 탭 아래 막대의 높이
-                  indicatorSize: TabBarIndicatorSize.label, //선택된 탭 아래 막대의 너비: 해당 탭의 글자의 너비에 맞게
+                indicatorSize: TabBarIndicatorSize.label, //선택된 탭 아래 막대의 너비: 해당 탭의 글자의 너비에 맞게
               ),
             ),
           ),
         ),
 
         body: SafeArea(
-            child: TabBarView(
-              children: [
-                Calendar(SingleGoals, SingleGoalsMap),      //개인 캘린더
-                Calendar(eventsList, AllGoalsMap),          //개인&공동 캘린더
-                Calendar(TogetherGoals, TogetherGoalsMap),  //공동 캘린더
-              ],
-            ),
+          child: TabBarView(
+            children: [
+              Calendar(SingleGoals, SingleGoalsMap),      //개인 캘린더
+              Calendar(eventsList, AllGoalsMap),          //개인&공동 캘린더
+              Calendar(TogetherGoals, TogetherGoalsMap),  //공동 캘린더
+            ],
+          ),
         ),
 
         //이벤트(목표) 추가 버튼
@@ -139,16 +139,12 @@ class _CalenderviewState extends State<Calenderview>{
               backgroundColor: PRIMARY_COLOR,
               onPressed: () async{
                 // 목표 설정에서 반환되는 값은 Event객체로 newGoal에 저장됨
-                final newGoal= await showDialog<Event>(
-                    context: context,                         //빌드할 컨텐츠
-                    barrierDismissible: true,                 //배경 탭했을 때 BottomSheet 닫기
-                    builder: (_) => AlertDialog(
-                      content: ScheduleBottomSheet(),    //ScheduleBottomSheet 페이지 팝업 형식으로 빌드
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)), // 모서리 둥글게
-                      backgroundColor: Colors.white,
-                    )
+                final newGoal= await showModalBottomSheet<Event>(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.white,
+                  builder: (context) => ScheduleBottomSheet(), // 기존 바텀시트 위젯
                 );
-
                 //위의 newGoal에 값이 있다면, Event 객체 리스트의 이벤트에 추가한 뒤, 재생성
                 if(newGoal!=null){
                   setState(() {

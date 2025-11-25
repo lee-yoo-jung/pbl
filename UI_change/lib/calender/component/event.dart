@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 class Plan {
   final String text;         // 계획 내용
   final DateTime selectdate;  // 계획 시작 시간 (날짜 포함)
+  final String type;
 
   Plan({
     required this.text,
     required this.selectdate,
+    required this.type,
   });
 }
 
@@ -16,8 +18,8 @@ class Event {
   final String title;
   final DateTime startDate;
   final DateTime endDate;
-  String hashtags;
   Color color; // color 클래스 추가
+  final String? emoji; // emoji 추가
   bool secret;
   List<String> togeter;
   List<Plan> plans = [];  //이벤트 속 계획 리스트, 일단 초기화
@@ -27,8 +29,8 @@ class Event {
     required this.startDate,
     required this.endDate,
     required this.togeter,
-    required this.hashtags,
     required this.color, // color 추가
+    required this.emoji,
     required this.secret,
     List<Plan>? plans,
   }): plans = plans ?? [];
