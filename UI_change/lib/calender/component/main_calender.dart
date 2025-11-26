@@ -26,52 +26,6 @@ class MainCalendar extends StatelessWidget{
     this.onPageChanged,
   });
 
-  Widget _buildCustomHeader(BuildContext context) {
-    // 현재 포커스된 날짜를 기준으로 'YYYY년 M월' 표시
-    final title = DateFormat('yyyy년 MM월', 'ko_KR').format(selectedDate);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // 이전 달 버튼
-          IconButton(
-            icon: const Icon(Icons.chevron_left_rounded, color: Colors.black),
-            onPressed: () {
-              final newDate = DateTime(selectedDate.year, selectedDate.month - 1, selectedDate.day);
-              onPageChanged?.call(newDate); // 부모 위젯에 변경 요청
-            },
-          ),
-
-          // 월/년도 텍스트 (타이틀)
-          Expanded(
-            child: Text(
-              title,
-              textAlign: TextAlign.center, // Row 중앙에 정렬되도록 Text도 중앙 정렬
-              style: const TextStyle(
-                fontFamily: "Pretendard",
-                fontWeight: FontWeight.w600,
-                fontSize: 15.0,
-                color: Colors.black,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-
-          // 다음 달 버튼
-          IconButton(
-            icon: const Icon(Icons.chevron_right_rounded, color: Colors.black),
-            onPressed: () {
-              final newDate = DateTime(selectedDate.year, selectedDate.month + 1, selectedDate.day);
-              onPageChanged?.call(newDate); // 부모 위젯에 변경 요청
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -80,13 +34,24 @@ class MainCalendar extends StatelessWidget{
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildCustomHeader(context),
+          /*_buildCustomHeader(context),*/
           Expanded(
             child:SingleChildScrollView(
               child: TableCalendar(
                 locale: 'ko_kr',                //한국어 적용
 
-                headerVisible: false,
+                headerVisible: true,
+
+                headerStyle: HeaderStyle(
+                  titleCentered: true,            //제목 중앙에 위치
+                  formatButtonVisible: false,     //달력 크기 선택 옵션
+                  titleTextStyle: TextStyle(      //제목 글꼴
+                    fontFamily: 'Pretendard',       // 글꼴
+                    fontWeight: FontWeight.w600,    // 글꼴 두께
+                    fontSize: 15.0,                 // 글꼴 크기
+                    color: Colors.black,  // 글꼴 색상
+                  ),
+                ),
 
                 ////어떤 날짜를 선택된 날짜로 지정할지 결정
                 onDaySelected: onDaySelected,
