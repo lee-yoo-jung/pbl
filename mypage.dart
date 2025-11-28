@@ -4,7 +4,8 @@ import 'package:pbl/tap/mypages/component/NotificationSetting.dart';
 import 'package:pbl/tap/mypages/component/PwChange.dart';
 import 'package:pbl/tap/mypages/component/chart/showchart.dart';
 import 'package:pbl/const/colors.dart';
-
+///목표 더보기
+import 'package:pbl/tap/mypages/component/goal_all.dart';
 
 class MyPage extends StatefulWidget {
   final bool isRankingPublic;
@@ -191,8 +192,14 @@ class _MyPageState extends State<MyPage> {
                   style: TextStyle(
                       fontSize: 16, fontWeight: FontWeight.w700,
                     fontFamily: 'Pretendard-Bold',)),
+              ///더보기 창으로 이동
               TextButton(
-                onPressed: () { /* 더보기 화면으로 이동 */ },
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context)=> GoalAll()),
+                  );
+                },
                 child: const Text('더보기', style: TextStyle(color: Colors.grey)),
               ),
             ],
