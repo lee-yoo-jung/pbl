@@ -213,7 +213,8 @@ class _GroupGoalPageState extends State<GroupGoalPage> {
               shrinkWrap: true,
               itemCount: goals.length,
               itemBuilder: (context, index) {
-                return GoalCard(
+                return
+                  GoalCard(
                   goal: goals[index],
                   // 목표를 탭하면 바로 개인 목표 달성률로 이동
                   onTap: () {
@@ -293,10 +294,11 @@ class GoalCard extends StatelessWidget {
     return Column(
      children: [
        Container(
-         margin: const EdgeInsets.symmetric(vertical: 5.0,horizontal: 5),
+         margin: const EdgeInsets.symmetric(vertical: 10.0,horizontal: 15),
          decoration: BoxDecoration(
            color: Colors.white,
            borderRadius: BorderRadius.circular(5),
+           border: Border.all(color:Colors.white10)
          ),
          child: InkWell(
            onTap: onTap,
@@ -407,16 +409,19 @@ class GoalDetailPage extends StatelessWidget {
                         children: [
                           Tooltip(
                             preferBelow: false,
-                            verticalOffset: -70,
+                            verticalOffset: -150,
                             padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
                             triggerMode: TooltipTriggerMode.tap,
                             decoration: BoxDecoration(
                               color: Colors.grey,
                               borderRadius: const BorderRadius.all(Radius.circular(10)),
                             ),
-                            message: "그룹내 팀원의 달성률에 따른 그룹 차등 보상 \n 세부 게획 수에 따른 경험치 설명",
+                            message: "• 개인 보상: 세부 계획 개수에 따라 경험치 추가 \n "
+                                "e.g 10개:+5 | 20개:+10 | 30개:+15 | 40개:+20 | 50개:+25)\n"
+                                "\n • 그룹 보상: 그룹 평균 달성률에 따라 경험치 추가 \n"
+                                "e.g 60%:+10 | 70%:+20 | 80%:+30 | 90%:+40 | 100%:+50",
                             textStyle: TextStyle(
-                              fontSize: 13,
+                              fontSize: 15,
                               fontWeight: FontWeight.w500,
                               color: Colors.white,
                             ),
@@ -502,14 +507,22 @@ class GoalDetailPage extends StatelessWidget {
                                             children: [
                                               Expanded(
                                                 flex: 3,
-                                                child: Text('최근 수행한 계획 or \n 수행할 계획')
+                                                child: LinearProgressIndicator(
+                                                  value: normalizedRate,
+                                                  backgroundColor: Colors.grey[200],
+                                                  color: percentage >= 100
+                                                      ? Colors.black54
+                                                      : Colors.grey,
+                                                  minHeight: 8,
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
                                               ),
                                               const SizedBox(width: 8),
                                               // 달성률 텍스트
                                               Expanded(
                                                 flex: 1,
-                                                child:Text( percentage==100?
-                                                  "$percentage%": "",
+                                                child:Text(
+                                                  "$percentage%",
                                                   style: TextStyle(
                                                     fontSize: 16,
                                                     fontWeight: FontWeight.w700,
@@ -528,24 +541,16 @@ class GoalDetailPage extends StatelessWidget {
                                     // 독촉하기 버튼
                                     // isCurrentUser 변수를 사용하여 현재 사용자가 아닐 때+달성률이 100(목표완료)가 아닐때 버튼을 표시
                                     if (!isCurrentUser&&percentage!=100)
-                                      ElevatedButton(
-                                        onPressed: () => _nudge(userName, completedCount, goal.totalSubTasks),
-                                        style: ElevatedButton.styleFrom(
-                                          foregroundColor: Colors.red,
-                                          shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(3),
-                                              side: BorderSide(color: Colors.red)
+                                      Column(
+                                        children: [
+                                          IconButton(
+                                            onPressed: () => _nudge(userName, completedCount, goal.totalSubTasks),
+                                            icon: const Icon(Icons.local_fire_department_sharp),iconSize: 30, color: Colors.red,
                                           ),
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 10, vertical: 8),
-                                        ),
-                                        child: const Text(
-                                          "독촉하기",
-                                          style: TextStyle(
-                                            fontSize: 14, fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
+                                          Text('Hurry Up', style: TextStyle( fontSize: 13),)
+                                        ],
+                                      )
+
                                   ],
                                 ),
                               ),
