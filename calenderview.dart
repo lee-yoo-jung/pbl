@@ -4,6 +4,7 @@ import 'package:pbl/tap/calender/component/schedule_bottom_sheet.dart';
 import 'package:pbl/tap/calender/component/prints.dart';
 import 'package:pbl/const/colors.dart';
 import 'package:pbl/tap/calender/component/event.dart';
+import 'package:pbl/tap/calender/component/alarm.dart';
 
 //<메인 화면(캘린더) 구상>
 
@@ -90,7 +91,12 @@ class _CalenderviewState extends State<Calenderview>{
               ),
               Spacer(),
               IconButton(
-                onPressed: null,
+                onPressed: (){
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context)=> AlarmList()),
+                  );
+                },
                 icon: Icon(Icons.notifications,
                   size: 25,
                   color: POINT_COLOR,
@@ -111,7 +117,7 @@ class _CalenderviewState extends State<Calenderview>{
                 ],
                 labelColor: Colors.black ,  //선택된 탭의 글 색상
                 unselectedLabelColor: Colors.grey,  //선택되지 않은 탭의 글 색상
-                indicatorColor: Colors.black, //선택된 탭 아래 막대 색상
+                indicatorColor: PRIMARY_COLOR, //선택된 탭 아래 막대 색상
                 indicatorWeight: 2.5, //선택된 탭 아래 막대의 높이
                 indicatorSize: TabBarIndicatorSize.label, //선택된 탭 아래 막대의 너비: 해당 탭의 글자의 너비에 맞게
               ),
@@ -142,6 +148,7 @@ class _CalenderviewState extends State<Calenderview>{
                 final newGoal= await showModalBottomSheet<Event>(
                   context: context,
                   isScrollControlled: true,
+                  backgroundColor: Colors.white,
                   builder: (context) => ScheduleBottomSheet(), // 기존 바텀시트 위젯
                 );
                 //위의 newGoal에 값이 있다면, Event 객체 리스트의 이벤트에 추가한 뒤, 재생성
