@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:pbl/tap/mypages/component/GoalTypeSetting.dart';
-//import 'package:pbl/tap/mypages/component/NotificationSetting.dart';
 import 'package:pbl/tap/mypages/component/PwChange.dart';
 import 'package:pbl/tap/mypages/component/chart/showchart.dart';
 import 'package:pbl/const/colors.dart';
+import 'package:pbl/tap/mypages/component/goal_all.dart';
 import 'package:pbl/tap/mypages/component/notification_service.dart';
-
+import 'package:pbl/tap/mypages/component/profile_edit.dart';
 
 class MyPage extends StatefulWidget {
   final bool isRankingPublic;
@@ -29,12 +29,6 @@ class _MyPageState extends State<MyPage> {
   // 알림 스위치 상태 변수
   bool _isNotificationEnabled = false;
 
-  //상세 페이지로 "내부 화면 전환"을 하는 함수
-  void _pushDetailView(Widget view) {
-    setState(() {
-      _currentDetailView = view;
-    });
-  }
 
   // 로그아웃 또는 탈퇴 시 팝업을 표시하는 함수
   void _showConfirmationDialog(String title, String content) {
@@ -98,7 +92,7 @@ class _MyPageState extends State<MyPage> {
     );
   }
 
-  //현재 상태에 맞는 Body를 반환하는 함수
+  // [수정 5] 현재 상태에 맞는 Body를 반환하는 함수
   Widget _buildBody() {
     // _currentDetailView가 null이 아니면 상세 페이지 위젯을, null이면 기본 프로필 화면을 보여줌
     return _currentDetailView ?? ListView(
@@ -134,8 +128,14 @@ class _MyPageState extends State<MyPage> {
               const SizedBox(width: 4),
               _buildGoalTypeChip('목표 유형'),
               const Spacer(),
+              ///편집 창으로 이동
               TextButton(
-                onPressed: () { /* 편집 화면으로 이동 */ },
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context)=> ProfileEditUI()),
+                  );
+                },
                 child: const Text('편집', style: TextStyle(color: Colors.grey)),
               ),
             ],
@@ -146,13 +146,13 @@ class _MyPageState extends State<MyPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 등급 이미지 (실제 이미지 경로로 수정 필요)
-              Image.asset('assets/images/badge.png', width: 80, height: 80),
+              Image.asset('assets/images/badge3.jpg', width: 80, height: 80),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('다이아', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const Text('인기스타', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -195,8 +195,14 @@ class _MyPageState extends State<MyPage> {
                   style: TextStyle(
                       fontSize: 16, fontWeight: FontWeight.w700,
                     fontFamily: 'Pretendard-Bold',)),
+              ///더보기 창으로 이동
               TextButton(
-                onPressed: () { /* 더보기 화면으로 이동 */ },
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context)=> GoalAll()),
+                  );
+                },
                 child: const Text('더보기', style: TextStyle(color: Colors.grey)),
               ),
             ],
@@ -301,7 +307,7 @@ class _MyPageState extends State<MyPage> {
             onTap: null, // 스위치로 직접 동작하므로 탭 이벤트는 비활성화
           ),
 
-          // '랭킹' 스위치 항목 추가
+          // [수정 2] '랭킹' 스위치 항목 추가
           _buildSettingsItem(
             text: '랭킹 보기', // 항목 이름
             trailing: Transform.scale(

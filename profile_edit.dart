@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+
 // 뱃지 데이터 모델
 class UserBadge {
   final String id;
@@ -58,10 +59,10 @@ class _ProfileEditUIState extends State<ProfileEditUI> {
 
   // 테스트용 뱃지 목록 (assetPath를 assets 폴더의 실제 파일 경로로 지정)
   final List<UserBadge> _availableBadges = [
-    UserBadge(id: '1', name: '응원왕', assetPath: 'assets/badge1.jpg', description: '50번 응원하기'),
-    UserBadge(id: '2', name: '성실이', assetPath: 'assets/badge2.jpg', description: '연속 100% 달성'),
-    UserBadge(id: '3', name: '인기스타', assetPath: 'assets/badge3.jpg', description: '20번 응원받기'),
-    UserBadge(id: '4', name: '꾸준이', assetPath: 'assets/badge4.jpg', description: '한 목표에서 체크된 계획 20개'),
+    UserBadge(id: '1', name: '응원왕', assetPath: 'assets/images/badge1.jpg', description: '50번 응원하기'),
+    UserBadge(id: '2', name: '성실이', assetPath: 'assets/images/badge2.jpg', description: '연속 100% 달성'),
+    UserBadge(id: '3', name: '인기스타', assetPath: 'assets/images/badge3.jpg', description: '20번 응원받기'),
+    UserBadge(id: '4', name: '꾸준이', assetPath: 'assets/images/badge4.jpg', description: '한 목표에서 체크된 계획 20개'),
   ];
 
   @override
