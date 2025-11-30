@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:pbl/tap/mypages/component/GoalTypeSetting.dart';
-import 'package:pbl/tap/mypages/component/NotificationSetting.dart';
+//import 'package:pbl/tap/mypages/component/NotificationSetting.dart';
 import 'package:pbl/tap/mypages/component/PwChange.dart';
 import 'package:pbl/tap/mypages/component/chart/showchart.dart';
 import 'package:pbl/const/colors.dart';
-///목표 더보기
-import 'package:pbl/tap/mypages/component/goal_all.dart';
+import 'package:pbl/tap/mypages/component/notification_service.dart';
+
 
 class MyPage extends StatefulWidget {
   final bool isRankingPublic;
@@ -25,6 +25,9 @@ class _MyPageState extends State<MyPage> {
   //현재 보여줄 화면을 관리하는 상태 변수. null이면 기본 프로필 화면.
   Widget? _currentDetailView;
   bool _isProfilePublic = true;
+
+  // 알림 스위치 상태 변수
+  bool _isNotificationEnabled = false;
 
   //상세 페이지로 "내부 화면 전환"을 하는 함수
   void _pushDetailView(Widget view) {
@@ -95,7 +98,7 @@ class _MyPageState extends State<MyPage> {
     );
   }
 
-  // [수정 5] 현재 상태에 맞는 Body를 반환하는 함수
+  //현재 상태에 맞는 Body를 반환하는 함수
   Widget _buildBody() {
     // _currentDetailView가 null이 아니면 상세 페이지 위젯을, null이면 기본 프로필 화면을 보여줌
     return _currentDetailView ?? ListView(
@@ -192,14 +195,8 @@ class _MyPageState extends State<MyPage> {
                   style: TextStyle(
                       fontSize: 16, fontWeight: FontWeight.w700,
                     fontFamily: 'Pretendard-Bold',)),
-              ///더보기 창으로 이동
               TextButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context)=> GoalAll()),
-                  );
-                },
+                onPressed: () { /* 더보기 화면으로 이동 */ },
                 child: const Text('더보기', style: TextStyle(color: Colors.grey)),
               ),
             ],
@@ -273,17 +270,38 @@ class _MyPageState extends State<MyPage> {
               );
             },
           ),
+          //알림 스위치로 변경
           _buildSettingsItem(
-            text: '알림 설정',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context)=> NotificationSettingsPage()),
-              );
-            },
+            text: '알림', // 텍스트 변경
+            trailing: Transform.scale(
+              scale: 0.9,
+              child: Switch(
+                value: _isNotificationEnabled,
+                onChanged: (value) async {
+                  setState(() {
+                    _isNotificationEnabled = value;
+                  });
+
+                  await NotificationService().setNotificationEnabled(value);
+
+                  // 안내 메시지
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(value ? '알림이 설정되었습니다.' : '알림이 해제되었습니다.'),
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
+                },
+                activeColor: Colors.black,
+                activeTrackColor: Colors.black54.withOpacity(0.5),
+                inactiveThumbColor: Colors.grey,
+                inactiveTrackColor: Colors.grey.withOpacity(0.3),
+              ),
+            ),
+            onTap: null, // 스위치로 직접 동작하므로 탭 이벤트는 비활성화
           ),
 
-          // [수정 2] '랭킹' 스위치 항목 추가
+          // '랭킹' 스위치 항목 추가
           _buildSettingsItem(
             text: '랭킹 보기', // 항목 이름
             trailing: Transform.scale(
