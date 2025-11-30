@@ -66,7 +66,7 @@ class NotificationService {
 
       // [핵심] 현재 시간보다 미래에 있는 일정만 알림 예약
       if (scheduledDate.isAfter(now)) {
-        await _scheduleNotification(
+        await scheduleNotification(
           id: i, // 고유 ID (리스트 인덱스 사용, 필요시 event.id 사용)
           title: "일정 알림", // 혹은 event.title
           body: "${event.title} 일정이 있습니다.", // 상세 내용
@@ -79,7 +79,7 @@ class NotificationService {
   }
 
   // 실제 알림 예약 실행 함수
-  Future<void> _scheduleNotification({
+  Future<void> scheduleNotification({
     required int id,
     required String title,
     required String body,
@@ -100,7 +100,7 @@ class NotificationService {
         ),
         iOS: DarwinNotificationDetails(),
       ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
       UILocalNotificationDateInterpretation.absoluteTime,
     );
