@@ -5,11 +5,13 @@ class Goal {
   String name;
   List<String> participants;
   String achievement;
+  DateTime end; //목표 기간의 종료일
 
   Goal({
     required this.name,
     required this.participants,
     required this.achievement,
+    required this.end,
   });
 }
 
@@ -18,17 +20,28 @@ final List<Goal> Goals = [
   Goal(
     name: "체중 10kg 감량하기",
     participants: [],
-    achievement: '60%'
+    achievement: '60%',
+    end: DateTime(2025,11,10),
   ),
   Goal(
     name: "토익 900점 이상 받기",
     participants: ["현재 사용자", "선우"],
-    achievement: '90%'
+    achievement: '90%',
+    end: DateTime(2025,4,6),
   ),
   Goal(
       name: "PBL A+ 받기",
     participants: ["현재 사용자", "은지", "태형", "수민", "현우"],
-    achievement: '40%'
+    achievement: '40%',
+    end: DateTime(2025,2,10),
+  ),
+
+  ///아직 안 끝남
+  Goal(
+    name: "체중 15kg 감량하기",
+    participants: [],
+    achievement: '60%',
+    end: DateTime(2026,11,1),
   ),
 ];
 
@@ -36,6 +49,12 @@ class GoalAll extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+
+    // end 날짜가 현재보다 이전인 목표만
+    final List<Goal> pastGoals = Goals
+        .where((goal) => goal.end.isBefore(DateTime.now()))
+        .toList();
+
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
@@ -54,9 +73,9 @@ class GoalAll extends StatelessWidget {
       ),
       body: // 참가자 목록 (개인별 달성률 표시)
           ListView.builder(
-              itemCount: Goals.length,  ///사용자의 목표 숫자
+              itemCount: pastGoals.length,  ///사용자의 목표 숫자
               itemBuilder: (context, index) {
-                final goal = Goals[index];
+                final goal = pastGoals[index];
                 final otherParticipants = goal.participants.where((p) => p != "현재 사용자").toList();
 
                 return Padding(
