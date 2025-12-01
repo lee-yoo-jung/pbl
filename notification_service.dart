@@ -4,6 +4,7 @@ import 'package:timezone/data/latest.dart' as tz; //tz=timezone
 import 'package:timezone/timezone.dart' as tz;
 import 'package:pbl/tap/calender/component/event.dart';
 import 'package:flutter/foundation.dart'; // debugPrint용
+import 'package:permission_handler/permission_handler.dart';
 
 class NotificationService {
   // 싱글톤 패턴
@@ -35,7 +36,15 @@ class NotificationService {
       iOS: initializationSettingsIOS,
     );
 
-    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+    await flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: (details) {
+        debugPrint("알림 클릭됨: ${details.payload}");
+      },
+    );
+
+    var status = await Permission.notification.request();
+    debugPrint('Android 알림 권한 상태: $status');
   }
 
   // [통합] 알림 스위치 ON/OFF 관리 함수
