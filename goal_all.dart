@@ -4,7 +4,7 @@ import 'package:pbl/const/colors.dart';
 class Goal {
   String name;
   List<String> participants;
-  String achievement;
+  int achievement;
   DateTime end; //목표 기간의 종료일
 
   Goal({
@@ -20,19 +20,19 @@ final List<Goal> Goals = [
   Goal(
     name: "체중 10kg 감량하기",
     participants: [],
-    achievement: '60%',
+    achievement: 60,
     end: DateTime(2025,11,10),
   ),
   Goal(
     name: "토익 900점 이상 받기",
     participants: ["현재 사용자", "선우"],
-    achievement: '90%',
+    achievement: 90,
     end: DateTime(2025,4,6),
   ),
   Goal(
       name: "PBL A+ 받기",
     participants: ["현재 사용자", "은지", "태형", "수민", "현우"],
-    achievement: '40%',
+    achievement: 40,
     end: DateTime(2025,2,10),
   ),
 
@@ -40,15 +40,39 @@ final List<Goal> Goals = [
   Goal(
     name: "체중 15kg 감량하기",
     participants: [],
-    achievement: '60%',
+    achievement: 0,
     end: DateTime(2026,11,1),
   ),
 ];
 
 class GoalAll extends StatelessWidget {
 
+  //달성도에 따른 나무 사진 인덱스
+  int MaxStage(int progress) {
+    if (progress < 15) return 0;
+    if (progress < 30) return 1;
+    if (progress < 45) return 2;
+    if (progress < 60) return 3;
+    if (progress < 75) return 4;
+    if (progress < 90) return 5;
+    if (progress < 100) return 6;
+    return 7;
+  }
+
   @override
   Widget build(BuildContext context) {
+
+    //나무 이미지
+    final List<String> treeImages = [
+      'assets/images/tree1.png',
+      'assets/images/tree2.png',
+      'assets/images/tree3.png',
+      'assets/images/tree4.png',
+      'assets/images/tree5.png',
+      'assets/images/tree6.png',
+      'assets/images/tree7.png',
+      'assets/images/tree8.png',
+    ];
 
     // end 날짜가 현재보다 이전인 목표만
     final List<Goal> pastGoals = Goals
@@ -120,12 +144,14 @@ class GoalAll extends StatelessWidget {
                                           style: const TextStyle(fontSize: 13,
                                               color: Colors.blueGrey),
                                         ),
+
                                       // 참여한 사용자 표시(본인제외)
                                       Text(
-                                        '달성률: ${goal.achievement}',
+                                        '달성률: ${goal.achievement} %',
                                         style: const TextStyle(fontSize: 12,
                                             color: Colors.blueGrey),
                                       ),
+                                      Image.asset(treeImages[MaxStage(goal.achievement)],width: 50,),
                                     ],
                                   )
 
