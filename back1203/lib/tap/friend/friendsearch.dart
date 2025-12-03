@@ -276,7 +276,7 @@ class _FriendListItemState extends State<FriendListItem> {
           ),
           const SizedBox(width: 8),
 
-          // 등급 표시
+          // 레벨 표시
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
@@ -284,7 +284,7 @@ class _FriendListItemState extends State<FriendListItem> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              '등급 ${widget.friend.level}',
+              '레벨 ${widget.friend.level}',
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 13,

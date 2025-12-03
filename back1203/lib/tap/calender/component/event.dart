@@ -3,8 +3,8 @@ import 'package:pbl/const/colors.dart';
 
 //Plan
 class Plan {
-  final int? id;
-  final int? goalId;
+  final String? id;
+  final String? goalId;
   String text;
   DateTime selectdate;
   bool isDone;
@@ -21,8 +21,8 @@ class Plan {
 
   factory Plan.fromJson(Map<String, dynamic> json) {
     return Plan(
-      id: int.tryParse(json['id'].toString()),
-      goalId: int.tryParse(json['goal_id'].toString()),
+      id: json['id']?.toString(),
+      goalId: json['goal_id']?.toString(),
       text: json['title'] ?? '', // DB 컬럼명은 title
       selectdate: DateTime.parse(json['created_at']).toLocal(), // DB 컬럼명은 created_at
       isDone: json['is_completed'] ?? false,
@@ -30,7 +30,7 @@ class Plan {
     );
   }
 
-  Map<String, dynamic> toJson(String userId, int goalId) {
+  Map<String, dynamic> toJson(String userId, String goalId) {
     return {
       'goal_id': goalId,
       'user_id': userId,
@@ -44,7 +44,7 @@ class Plan {
 
 //Event
 class Event {
-  final int? id;
+  final String? id;
   String title;
   String description;
   DateTime startDate;
@@ -71,7 +71,7 @@ class Event {
 
   factory Event.fromJson(Map<String, dynamic> json) {
     return Event(
-      id: int.tryParse(json['id'].toString()),
+      id: json['id']?.toString(),
       title: json['title'] ?? '',
       description: json['description'] ?? '',
       startDate: DateTime.parse(json['created_at']).toLocal(),
@@ -83,7 +83,7 @@ class Event {
           ? (json['todos'] as List).map((plan) => Plan.fromJson(plan)).toList()
           : [],
       color: json['color'] != null
-          ? _hexToColor(json['color'])
+          ? hexToColor(json['color'])
           : PRIMARY_COLOR,
     );
   }
@@ -98,15 +98,15 @@ class Event {
       'visibility': secret,
       'together': togeter,
       'emoji': emoji,
-      'color': _colorToHex(color),
+      'color': colorToHex(color),
     };
   }
 
-  static String _colorToHex(Color color) {
+  static String colorToHex(Color color) {
     return '#${color.value.toRadixString(16).padLeft(8, '0').toUpperCase()}';
   }
 
-  static Color _hexToColor(String hexString) {
+  static Color hexToColor(String hexString) {
     try {
       final buffer = StringBuffer();
       if (hexString.length == 6 || hexString.length == 7) buffer.write('ff');

@@ -228,7 +228,7 @@ class _FriendListCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 프로필, 닉네임, 등급 섹션
+            // 프로필, 닉네임, 레벨 섹션
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -275,7 +275,7 @@ class _FriendListCard extends StatelessWidget {
                   ),
                 ),
 
-                // 등급 표시 (오른쪽 끝)
+                // 레벨 표시 (오른쪽 끝)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
@@ -283,7 +283,7 @@ class _FriendListCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    '등급 ${friend.level}',
+                    '레벨 ${friend.level}',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 11,

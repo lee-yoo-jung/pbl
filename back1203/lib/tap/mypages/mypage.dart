@@ -27,20 +27,116 @@ class MyPage extends StatefulWidget {
   State<MyPage> createState() => _MyPageState();
 }
 
-class _MyPageState extends State<MyPage> {
+class _MyPageState extends State<MyPage> with AutomaticKeepAliveClientMixin {
 //현재 보여줄 화면을 관리하는 상태 변수. null이면 기본 프로필 화면.
   Widget? _currentDetailView;
+  bool _isLoading = true;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  // 백엔드 데이터
+  String _nickname = '사용자';
+  String _email = '';
+  int _level = 1;
+  int _exp = 0;
+  List<String> _goalTypes = [];
+  String? _avatarUrl;
+
   bool _isProfilePublic = true;
+
+  // 목표 리스트
+  List<Map<String, dynamic>> _ongoingGoals = [];
+  List<Map<String, dynamic>> _completedGoals = [];
 
 // 알림 스위치 상태 변수
   bool _isNotificationEnabled = false;
 
   //상세 페이지로 "내부 화면 전환"을 하는 함수
-  void _pushDetailView(Widget view) {
-    setState(() {
-      _currentDetailView = view;
-    });
+  // void _pushDetailView(Widget view) {
+  //   setState(() {
+  //     _currentDetailView = view;
+  //   });
+  // }
+
+  // 데이터 로드 함수
+  Future<void> _fetchUserData() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      // USERS 테이블 조회
+      final userData = await supabase
+          .from('users')
+          .select()
+          .eq('id', user.id)
+          .single();
+
+      // GOALS 테이블 조회
+      final goalsData = await supabase
+          .from('goals')
+          .select()
+          .eq('owner_id', user.id)
+          .order('created_at', ascending: false);
+
+      setState(() {
+        _email = user.email ?? '';
+        _nickname = userData['nickname'] ?? '사용자';
+        _level = userData['level'] ?? 1; // null이면 1
+        _exp = userData['exp'] ?? 0;
+        _avatarUrl = userData['avatar_url'];
+        _isProfilePublic = userData['is_profile_public'] ?? true;
+
+        if (userData['goal_types'] != null) {
+          _goalTypes = List<String>.from(userData['goal_types']);
+        }
+
+        // 목표 분류 로직
+        // completed_at이 null이면 진행중, 값이 있으면 완료됨
+        _ongoingGoals = List<Map<String, dynamic>>.from(
+            goalsData.where((g) => g['completed_at'] == null));
+
+        _completedGoals = List<Map<String, dynamic>>.from(
+            goalsData.where((g) => g['completed_at'] != null));
+      });
+    } catch (e) {
+      debugPrint('마이페이지 데이터 로드 에러: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
+
+  // 프로필 공개 설정 업데이트
+  Future<void> _updateProfilePrivacy(bool value) async {
+    setState(() {
+      _isProfilePublic = value;
+    });
+
+    try {
+      final user = supabase.auth.currentUser;
+      if (user != null) {
+        await supabase
+            .from('users')
+            .update({'is_profile_public': value})
+            .eq('id', user.id);
+
+        debugPrint('프로필 공개 설정 저장 완료: $value');
+      }
+    } catch (e) {
+      debugPrint('설정 저장 실패: $e');
+      setState(() {
+        _isProfilePublic = !value;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('설정 저장에 실패했습니다.')),
+      );
+    }
+  }
+
   // 로그아웃 함수
   Future<void> _signOut() async {
     try {
@@ -102,6 +198,8 @@ class _MyPageState extends State<MyPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+
     return WillPopScope(
       onWillPop: () async {
         if (_currentDetailView != null) {
@@ -155,21 +253,34 @@ class _MyPageState extends State<MyPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-// 이름, 목표 유형, 편집 버튼
           Row(
             children: [
-              const CircleAvatar(
+              // 프로필 이미지 (avatar_url)
+              CircleAvatar(
                 radius: 20,
                 backgroundColor: Colors.grey,
-                child: Icon(Icons.person, color: Colors.white),
+                backgroundImage: _avatarUrl != null && _avatarUrl!.isNotEmpty
+                    ? NetworkImage(_avatarUrl!)
+                    : null,
+                child: (_avatarUrl == null || _avatarUrl!.isEmpty)
+                    ? const Icon(Icons.person, color: Colors.white)
+                    : null,
               ),
               const SizedBox(width: 10),
-              const Text('내이름',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+
+              // 닉네임
+              Text(_nickname,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(width: 8),
-              _buildGoalTypeChip('목표 유형'),
-              const SizedBox(width: 4),
-              _buildGoalTypeChip('목표 유형'),
+
+              // 목표 유형 칩 (최대 2개 표시)
+              ..._goalTypes.take(2).map((type) => Row(
+                children: [
+                  _buildGoalTypeChip(type),
+                  const SizedBox(width: 4),
+                ],
+              )),
+
               const Spacer(),
 
               ///편집 창으로 이동
@@ -178,7 +289,7 @@ class _MyPageState extends State<MyPage> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => ProfileEditUI()),
-                  );
+                  ).then((_) => _fetchUserData());
                 },
                 child: const Text('편집', style: TextStyle(color: Colors.grey)),
               ),
@@ -196,19 +307,19 @@ class _MyPageState extends State<MyPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('다이아', style: TextStyle(
+                        Text('레벨: $_level', style: TextStyle(
                         fontSize: 16, fontWeight: FontWeight.bold)),
                     const Text('인기스타', style: TextStyle(
                         fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        const Text('EXP: 412/500',
+                            Text('EXP: $_exp/500',
                             style: TextStyle(color: Colors.grey)),
                         const SizedBox(width: 8),
                         Expanded(
                           child: LinearProgressIndicator(
-                            value: 412 / 500,
+                            value: (_exp % 500) / 500,
                             backgroundColor: Colors.grey[300],
                             valueColor: const AlwaysStoppedAnimation<Color>(
                                 Colors.black54),
@@ -219,9 +330,14 @@ class _MyPageState extends State<MyPage> {
                     const SizedBox(height: 12),
                     const Text('진행중인 목표',
                         style: TextStyle(fontWeight: FontWeight.bold)),
-                    _buildGoalItem('체중 5kg 감량하기'),
-                    _buildGoalItem('토익 900점 이상 받기'),
-                    _buildGoalItem('PBL A+ 받기'),
+                    // 진행 중인 목표 리스트 (DB 연동)
+                    if (_ongoingGoals.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8.0),
+                        child: Text("진행 중인 목표가 없습니다.", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                      )
+                    else
+                      ..._ongoingGoals.take(3).map((g) => _buildGoalItem(g['title'] ?? '')),
                   ],
                 ),
               ),
@@ -252,15 +368,20 @@ class _MyPageState extends State<MyPage> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => GoalAll()),
-                  );
+                  ).then((_) => _fetchUserData());
                 },
                 child: const Text('더보기', style: TextStyle(color: Colors.grey)),
               ),
             ],
           ),
-          _buildGoalItem('체중 10kg 감량하기'),
-          _buildGoalItem('토익 900점 이상 받기'),
-          _buildGoalItem('PBL A+ 받기'),
+          if (_completedGoals.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8.0),
+              child: Text("완료된 목표가 없습니다.", style: TextStyle(color: Colors.grey)),
+            )
+          else
+            ..._completedGoals.take(3).map((g) => _buildGoalItem(g['title'] ?? '')),
+
           const Divider(height: 20),
 // 목표 데이터 분석
           InkWell(
@@ -312,7 +433,7 @@ class _MyPageState extends State<MyPage> {
                 value: _isProfilePublic,
                 onChanged: (value) {
                   setState(() {
-                    _isProfilePublic = value;
+                    _updateProfilePrivacy(value);
                   });
                 },
                 activeColor: Colors.black,
