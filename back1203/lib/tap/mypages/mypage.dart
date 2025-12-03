@@ -96,10 +96,10 @@ class _MyPageState extends State<MyPage> with AutomaticKeepAliveClientMixin {
         // 목표 분류 로직
         // completed_at이 null이면 진행중, 값이 있으면 완료됨
         _ongoingGoals = List<Map<String, dynamic>>.from(
-            goalsData.where((g) => g['completed_at'] == null));
+            goalsData.where((g) => g['is_completed'] == false)); // false = 진행 중
 
         _completedGoals = List<Map<String, dynamic>>.from(
-            goalsData.where((g) => g['completed_at'] != null));
+            goalsData.where((g) => g['is_completed'] == true));  // true = 완료함
       });
     } catch (e) {
       debugPrint('마이페이지 데이터 로드 에러: $e');
