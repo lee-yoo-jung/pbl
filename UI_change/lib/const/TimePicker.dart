@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:pbl/const/colors.dart';
 
 Future<String?> showTimeWheelPicker(BuildContext context) async {
-  return await showModalBottomSheet<String>(
+  return await showDialog<String>(
     context: context,
-    isScrollControlled: false,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.only(
-        topLeft: Radius.circular(15.0),
-        topRight: Radius.circular(15.0),
-      ),
-    ),
     builder: (BuildContext context) {
-      return const _TimeWheelPicker();
+      return AlertDialog(
+        backgroundColor: Colors.white,
+        contentPadding: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15.0),
+        ),
+        content: const _TimeWheelPicker(),
+      );
     },
   );
 }
@@ -40,7 +40,7 @@ class _TimeWheelPickerState extends State<_TimeWheelPicker> {
     final now = TimeOfDay.now();
     isAm = now.period == DayPeriod.am;
     // 12시간제 시간 (12시는 12로, 1시는 1로)
-    selectedHour = now.hourOfPeriod;
+    selectedHour = now.hourOfPeriod == 0 ? 12 : now.hourOfPeriod;
     // 분을 5분 단위로 반올림하여 초기값 설정
     selectedMinute = (now.minute ~/ 5) * 5;
 
@@ -77,133 +77,149 @@ class _TimeWheelPickerState extends State<_TimeWheelPicker> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 250,
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+          SizedBox(
+            height: 150,
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                SizedBox(
-                  width: 70,
-                  child: ListWheelScrollView.useDelegate(
-                    controller: _hourController,
-                    itemExtent: 50,
-                    perspective: 0.005,
-                    diameterRatio: 1.2,
-                    physics: const FixedExtentScrollPhysics(),
-                    onSelectedItemChanged: (index) {
-                      setState(() {
-                        // index : 0~12
-                        selectedHour = index;
-                      });
-                    },
-                    childDelegate: ListWheelChildBuilderDelegate(
-                      childCount: 13, // 0~12
-                      builder: (context, index) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 5.0),
-                        child: Center(
-                          child: Text(
-                              index.toString(),
-                              style: const TextStyle(
-                                fontFamily: 'Pretendard',
-                                fontSize: 20,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black,
-                              )
+                Container(
+                  height: 50,
+                  margin: const EdgeInsets.symmetric(horizontal: 0), // 좌우 여백
+                  decoration: BoxDecoration(
+                    color: PRIMARY_COLOR.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 50,
+                      child: ListWheelScrollView.useDelegate(
+                        controller: _hourController,
+                        itemExtent: 50,
+                        perspective: 0.005,
+                        diameterRatio: 1.2,
+                        physics: const FixedExtentScrollPhysics(),
+                        onSelectedItemChanged: (index) {
+                          setState(() {
+                            // index : 0~12
+                            selectedHour = index;
+                          });
+                        },
+                        childDelegate: ListWheelChildBuilderDelegate(
+                          childCount: 13, // 0~12
+                          builder: (context, index) => Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 5.0),
+                            child: Center(
+                              child: Text(
+                                  index.toString(),
+                                  style: const TextStyle(
+                                    fontFamily: 'Pretendard',
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black,
+                                  )
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ),
 
-                const Text(":", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-                const SizedBox(width: 10),
+                    const Text(":", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+                    const SizedBox(width: 10),
 
-                // 분
-                SizedBox(
-                  width: 70,
-                  child: ListWheelScrollView.useDelegate(
-                    controller: _minuteController,
-                    itemExtent: 50,
-                    perspective: 0.005,
-                    diameterRatio: 1.2,
-                    physics: const FixedExtentScrollPhysics(),
-                    onSelectedItemChanged: (index) {
-                      setState(() {
-                        // 5분 단위 계산
-                        selectedMinute = index * 5;
-                      });
-                    },
-                    childDelegate: ListWheelChildBuilderDelegate(
-                        childCount: 13,
-                        builder: (context, index) {
-                          final mins = index * 5;
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 5.0),
-                            child: Center(
-                              child: Text(
-                                  mins < 10 ? '0' + mins.toString() : mins.toString(),
-                                  style: const TextStyle(
-                                    fontFamily: 'Pretendard',
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.black,
-                                  )
-                              ),
-                            ),
-                          );
-                        }
+                    // 분
+                    SizedBox(
+                      width: 50,
+                      child: ListWheelScrollView.useDelegate(
+                        controller: _minuteController,
+                        itemExtent: 50,
+                        perspective: 0.005,
+                        diameterRatio: 1.2,
+                        physics: const FixedExtentScrollPhysics(),
+                        onSelectedItemChanged: (index) {
+                          setState(() {
+                            // 5분 단위 계산
+                            selectedMinute = index * 5;
+                          });
+                        },
+                        childDelegate: ListWheelChildBuilderDelegate(
+                            childCount: 12,
+                            builder: (context, index) {
+                              final mins = index * 5;
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 5.0),
+                                child: Center(
+                                  child: Text(
+                                      mins < 10 ? '0' + mins.toString() : mins.toString(),
+                                      style: const TextStyle(
+                                        fontFamily: 'Pretendard',
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.black,
+                                      )
+                                  ),
+                                ),
+                              );
+                            }
+                        ),
+                      ),
                     ),
-                  ),
-                ),
 
-                const SizedBox(width: 15),
+                    const SizedBox(width: 15),
 
-                // AM/PM
-                SizedBox(
-                  width: 70,
-                  child: ListWheelScrollView.useDelegate(
-                    controller: _ampmController,
-                    itemExtent: 50,
-                    perspective: 0.005,
-                    diameterRatio: 1.2,
-                    physics: const FixedExtentScrollPhysics(),
-                    onSelectedItemChanged: (index) {
-                      setState(() {
-                        // index 0: am, index 1: pm
-                        isAm = index == 0;
-                      });
-                    },
-                    childDelegate: ListWheelChildBuilderDelegate(
-                        childCount: 2,
-                        builder: (context, index) {
-                          final isItAm = index == 0;
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 5.0),
-                            child: Center(
-                              child: Text(
-                                  isItAm ? 'am' : 'pm',
-                                  style: const TextStyle(
-                                    fontFamily: 'Pretendard',
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.black,
-                                  )
-                              ),
-                            ),
-                          );
-                        }
+                    // AM/PM
+                    SizedBox(
+                      width: 50,
+                      child: ListWheelScrollView.useDelegate(
+                        controller: _ampmController,
+                        itemExtent: 50,
+                        perspective: 0.005,
+                        diameterRatio: 1.2,
+                        physics: const FixedExtentScrollPhysics(),
+                        onSelectedItemChanged: (index) {
+                          setState(() {
+                            // index 0: am, index 1: pm
+                            isAm = index == 0;
+                          });
+                        },
+                        childDelegate: ListWheelChildBuilderDelegate(
+                            childCount: 2,
+                            builder: (context, index) {
+                              final isItAm = index == 0;
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 5.0),
+                                child: Center(
+                                  child: Text(
+                                      isItAm ? 'am' : 'pm',
+                                      style: const TextStyle(
+                                        fontFamily: 'Pretendard',
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.black,
+                                      )
+                                  ),
+                                ),
+                              );
+                            }
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
           ),
+
+          const SizedBox(height: 15),
 
           // 확인 버튼
           ElevatedButton(
@@ -212,9 +228,9 @@ class _TimeWheelPickerState extends State<_TimeWheelPicker> {
             },
             child: const Text('확인'),
             style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: PRIMARY_COLOR,
-                side: const BorderSide(color: PRIMARY_COLOR),
+                backgroundColor: PRIMARY_COLOR,
+                foregroundColor: Colors.white,
+                side: BorderSide.none,
                 minimumSize: const Size(double.infinity, 40)
             ),
           )
