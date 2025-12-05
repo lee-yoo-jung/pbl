@@ -1,8 +1,8 @@
-import 'package:pbl/const/colors.dart';
+import 'package:pbl_back/const/colors.dart';
 import 'package:flutter/material.dart';
-import 'package:pbl/tap/calender/component/event.dart';
-import 'package:pbl/tap/calender/component/detailplan.dart';
-import 'package:pbl/tap/calender/board/board.dart';
+import 'package:pbl_back/tap/calender/component/event.dart';
+import 'package:pbl_back/tap/calender/component/detailplan.dart';
+import 'package:pbl_back/tap/calender/board/board.dart';
 import 'dart:async';  ///Timer 라이브러리
 /*<이벤트와 이벤트 속 계획 리스트를 출력>
 <이벤트 삭제와 계획 추가/삭제를 할 수 있는 로직>*/
@@ -33,12 +33,30 @@ class PrintsState extends State<Prints>{
   //시간 제거해서 날짜 형식 통일
   DateTime getDateKey(DateTime date) => DateTime(date.year, date.month, date.day);
 
+  String? nickname;
+
+  Future<void> fetchNickname() async {
+    final currentUserId = supabase.auth.currentUser?.id;
+
+    if (currentUserId == null) return;
+
+    final response = await supabase
+        .from('users')
+        .select('id, nickname, avatar_url')
+        .eq('id', currentUserId)
+        .maybeSingle();
+
+    setState(() {
+      nickname = response?['nickname'] ?? '익명';
+    });
+  }
+
   ///시간에 따라 체크박스 나타나게
   late Timer timer;
   @override
   void initState(){
     super.initState();
-
+    fetchNickname();
     //1초마다 확인 후, UI 갱신
     timer=Timer.periodic(const Duration(seconds: 1),(_){
       if(mounted) setState(() {});
@@ -566,12 +584,15 @@ class PrintsState extends State<Prints>{
 
                                         ///인증사진 or 체크 페이지로 이동
                                         ///<board.dart에서 [확인] 누를시, DB에 체킹되게>
-                                        onChanged: (tf) {
+                                        onChanged: (tf) async{
+                                          final todo = plan;
+
+                                          if (nickname == null) await fetchNickname();
                                           Navigator.push(
                                             context,
                                             MaterialPageRoute(
                                                 builder: (context) =>
-                                                    CheckingPhoto()),
+                                                    CheckingPhoto(todo: todo, nickname: nickname!,)),
                                           );
                                         },
                                           /*
