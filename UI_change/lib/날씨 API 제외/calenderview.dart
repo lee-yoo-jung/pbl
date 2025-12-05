@@ -6,9 +6,6 @@ import 'package:pbl/const/colors.dart';
 import 'package:pbl/tap/calender/component/event.dart';
 import 'package:pbl/tap/calender/component/alarm.dart';
 import 'package:pbl/services/supabase_calendar_service.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:pbl/weather/weather_api_service.dart';
-import 'package:pbl/weather/weather_day.dart';
 
 //<메인 화면(캘린더) 구상>
 
@@ -24,11 +21,7 @@ class _CalenderviewState extends State<Calenderview>{
   List<Event> eventsList = [];
   bool _isLoading = false;
 
-  // 날씨
-  List<WeatherDay> _weatherForecasts = [];
-  Map<DateTime, WeatherDay> _weatherForecastMap = {};
-  final WeatherApiService _weatherService = WeatherApiService();
-
+  
   //선택된 날짜를 관리할 변수
   DateTime selectedDate=DateTime.utc(
     DateTime.now().year,
@@ -41,7 +34,6 @@ class _CalenderviewState extends State<Calenderview>{
   void initState() {
     super.initState();
     _loadEvents();
-    _loadWeather();
   }
 
   Future<void> _loadEvents() async {
@@ -55,62 +47,6 @@ class _CalenderviewState extends State<Calenderview>{
       print("데이터 로드 실패: $e");
     } finally {
       setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _loadWeather() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        print("위치 권한 없음");
-        setState(() {
-          _weatherForecasts = [];
-          _isLoading = false;
-        });
-        return;
-      }
-
-      Position position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.low),
-      );
-
-      final forecasts = await _weatherService.fetchAllWeatherForecast(position);
-
-      if (forecasts == null || forecasts.isEmpty) {
-        print("날씨 API 응답이 없거나 비어있음");
-        setState(() {
-          _weatherForecasts = [];
-          _isLoading = false;
-        });
-        return;
-      }
-
-      setState(() {
-        _weatherForecasts = forecasts;
-        _isLoading = false;
-        _weatherForecastMap = forecasts.fold<Map<DateTime, WeatherDay>>({}, (map, day) {
-          // 시간 정보를 제거한 순수한 날짜를 키로 사용
-          final dateKey = DateTime(day.date.year, day.date.month, day.date.day);
-          map[dateKey] = day;
-          return map;
-        });
-      });
-    } catch (e, stack) {
-      print("날씨 데이터 로드 중 오류 발생: $e");
-      print(stack);
-      setState(() {
-        _weatherForecasts = [];
-        _isLoading = false;
-      });
     }
   }
 
@@ -171,7 +107,7 @@ class _CalenderviewState extends State<Calenderview>{
                 ),
               ),
               const Spacer(),
-
+              
               IconButton(
                 onPressed: (){
                   Navigator.push(
@@ -186,7 +122,7 @@ class _CalenderviewState extends State<Calenderview>{
               ),
             ],
           ),
-          toolbarHeight: 40.0,  //앱바의 높이 지정
+          toolbarHeight: 50.0,  //앱바의 높이 지정
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(kToolbarHeight),
             child: Container(
@@ -252,8 +188,6 @@ class _CalenderviewState extends State<Calenderview>{
   }
 
   Widget Calendar (List<Event> list, Map<DateTime,List<Event>> map){
-    _weatherForecasts.isNotEmpty ? _weatherForecasts.first : null;
-
     return SafeArea(
       //달력과 목표/계획의 리스트를 세로로 배치
       child: Stack(
