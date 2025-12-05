@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:pbl/tap/calender/component/custom_text_field.dart';
-import 'package:pbl/const/colors.dart';
-import 'package:pbl/tap/calender/component/event.dart';
-import 'package:pbl/const/TimePicker.dart';
+import 'package:pbl_back/tap/calender/component/custom_text_field.dart';
+import 'package:pbl_back/const/colors.dart';
+import 'package:pbl_back/tap/calender/component/event.dart';
+import 'package:pbl_back/const/TimePicker.dart';
 
 
 //<계획의 시간과 내용을 입력하는 페이지>
 
 class Detailplan extends StatefulWidget {
+
   final Event event;
   final DateTime initialDate;
 
@@ -29,6 +30,10 @@ class _Detailplan extends State<Detailplan> {
   final TextEditingController startTimeController = TextEditingController();  //입력한 텍스트를 가져오기 (시간)
   final TextEditingController planController = TextEditingController();       //입력한 텍스트를 가져오기 (계획)
 
+  final List<String> planTypes = ['공부', '운동', '식단', '음악', '기타'];
+
+  String? selectedType;
+
   //페이지가 생성될 때 한번만 initSate() 생성
   @override
   void initState() {
@@ -47,56 +52,179 @@ class _Detailplan extends State<Detailplan> {
 
       //Child을 스크롤할 수 있게 함
       content: SingleChildScrollView(
-        padding: const EdgeInsets.all(25),  //페이지와 이 요소의 여백
+        padding: EdgeInsets.all(5),
 
         //날짜 배치와 시간 설정, 계획 텍스트, 저장 버튼을 세로로 배치
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch, //가로로 각 요소를 늘리기,
-
-
           children: [
-            Text("날짜: "+_formatDate(selectedDate!),
+            Text( _formatDate(selectedDate!),
               style: TextStyle(
                 color: PRIMARY_COLOR,
                 fontSize: 15,
                 fontFamily: 'Pretendard',
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
               ),
             ), //선택한 날짜 표시 = 계획을 추가할 날짜
 
-            const SizedBox(height: 20),  //날짜와 시간 설정의 간격
-
-            //시간 설정
-            SizedBox(
-              height: 60,
-              //시간 표시 필드
-              child: CustomTextField(
-                label: '시작 시간',
-                isTime: true,                     //시간만 가능
-                readOnly: true,                   //입력할 수 없게
-                controller: startTimeController,  //설정한 시간(텍스트)을 읽을 수 있게
-
-                onTap: () async {   //눌렀을 때. 시간 다이얼로그 (showTimeWheelPicker)을 실행하고, String 타입의 pickedTime에 저장
-                  // showTimePicker 대신 showTimeWheelPicker 사용
-                  final pickedTime = await showTimeWheelPicker(context);
-
-                  //pickedTime이 비어있지 않으면, 텍스트를 읽는 곳에 pickedTime의 시각(HH:MM)을 입력하기
-                  if (pickedTime != null) {
-                    startTimeController.text = pickedTime;
-                  }
-                },
-              ),
-            ),
-
-            const SizedBox(height: 20),  //시간 다이얼로그와 계획을 적는 필드의 간격 설정
+            const SizedBox(height: 10),  //날짜와 시간 설정의 간격
 
             //계획을 적는 필드
             SizedBox(
-              height: 60,
-              child: CustomTextField(
-                label: '계획',
-                isTime: false,              //시간 형태 불가능
-                controller: planController, //설정한 계획을 읽을 수 있게
+              height: 40,
+              child: TextFormField(
+                controller: planController,
+                keyboardType: TextInputType.text,
+
+                decoration: InputDecoration(
+                  hintText: '예: 헬스장 가기',
+                  hintStyle: TextStyle(
+                    fontFamily: 'Pretendard',
+                    fontSize: 16,
+                    color: Colors.grey.shade600,
+                  ),
+                  labelText: '계획',
+                  labelStyle: TextStyle(
+                    fontFamily: 'Pretendard',
+                    fontSize: 16,
+                    color: Colors.grey.shade600,
+                  ),
+
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(8.0)),
+                    borderSide: BorderSide(color: Colors.grey.shade400),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: const BorderRadius.all(Radius.circular(8.0)),
+                    borderSide: BorderSide(color: PRIMARY_COLOR, width: 2.0),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),  // 계획 필드와 시간 필드 사이의 간격
+
+            //시간 설정
+            SizedBox(
+              height: 40,
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  side: BorderSide(
+                    color: Colors.grey.shade600,
+                    width: 1.0,
+                  ),
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+
+                onPressed: () async {
+                  final pickedTime = await showTimeWheelPicker(context);
+
+                  if (pickedTime != null) {
+                    startTimeController.text = pickedTime;
+                    setState(() {});
+                  }
+                },
+
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // 텍스트 표시: 시간이 있으면 시간, 없으면 레이블 표시
+                    Text(
+                      startTimeController.text.isNotEmpty
+                          ? startTimeController.text
+                          : '시작 시간',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontFamily: 'Pretendard',
+                        color: startTimeController.text.isNotEmpty
+                            ? Colors.black
+                            : Colors.grey.shade600,
+                      ),
+                    ),
+
+                    // 시계 아이콘 추가
+                    Icon(
+                      Icons.access_time,
+                      color: Colors.grey.shade400,
+                      size: 24,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20), // 계획 필드와 유형 필드 사이의 간격
+
+            // 유형을 고르는 필드
+            SizedBox(
+              height: 50,
+              child: DropdownButtonFormField<String>(
+                decoration: InputDecoration(
+                  labelText: '유형',
+                  labelStyle: TextStyle(
+                    fontFamily: 'Pretendard',
+                    fontSize: 16,
+                    color: Colors.grey.shade600,
+                  ),
+
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(8.0)),
+                    borderSide: BorderSide(color: Colors.grey.shade400),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: const BorderRadius.all(Radius.circular(8.0)),
+                    borderSide: BorderSide(color: PRIMARY_COLOR, width: 2.0),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+
+                dropdownColor: Colors.white,  // 배경
+                elevation: 4, // 그림자
+
+                // 항목 스타일
+                selectedItemBuilder: (BuildContext context) {
+                  return planTypes.map((String type) {
+                    return Text(
+                        type,
+                        style: TextStyle(
+                          fontFamily: 'Pretendard',
+                          fontSize: 16,
+                          color: PRIMARY_COLOR,
+                        )
+                    );
+                  }).toList();
+                },
+
+                value: selectedType,
+                hint: Text(
+                  '유형을 선택해주세요',
+                  style: TextStyle(
+                      fontFamily: 'Pretendard',
+                      fontSize: 16,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500
+                  ),
+                ),
+
+                items: planTypes.map((String type) {
+                  return DropdownMenuItem<String>(
+                    value: type,
+                    child: Text(type),
+                  );
+                }).toList(),
+
+                onChanged: (String? newValue) {
+                  setState(() {
+                    selectedType = newValue;
+                  });
+                },
+
+                iconSize: 24,
               ),
             ),
 
@@ -105,10 +233,16 @@ class _Detailplan extends State<Detailplan> {
             //저장 버튼
             ElevatedButton(
               onPressed: savePlan, //눌렀을 때 savePlan 함수가 실행하기
-              style: ElevatedButton.styleFrom(foregroundColor: PRIMARY_COLOR),
-              child: const Text("저장",
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: PRIMARY_COLOR,
+                  foregroundColor: Colors.white,
+                  side: BorderSide.none,
+                  minimumSize: const Size(double.infinity, 40)
+              ),
+              child: const Text(
+                "저장",
                 style: TextStyle(
-                  color: PRIMARY_COLOR,
+                  color: Colors.white,
                   fontSize: 15,
                   fontFamily: 'Pretendard',
                   fontWeight: FontWeight.w700,
@@ -144,7 +278,7 @@ class _Detailplan extends State<Detailplan> {
       int.parse(timeParts[1]),
     );
 
-    final newPlan = Plan(text: planController.text, selectdate:selectedDateTime); //계획과 DateTime 타입으로 만든 날짜와 시간을 Plan 클래스에 담아 저장
+    final newPlan = Plan(text: planController.text, selectdate:selectedDateTime, hashtag: selectedType!); //계획과 DateTime 타입으로 만든 날짜와 시간을 Plan 클래스에 담아 저장
 
     Navigator.pop(context, newPlan); // 캘린더 페이지로 newPlan을 반환
   }
