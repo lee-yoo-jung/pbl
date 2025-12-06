@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:pbl/tap/calender/component/main_calender.dart';
-import 'package:pbl/tap/calender/component/schedule_bottom_sheet.dart';
-import 'package:pbl/tap/calender/component/prints.dart';
-import 'package:pbl/const/colors.dart';
-import 'package:pbl/tap/calender/component/event.dart';
-import 'package:pbl/tap/calender/component/alarm.dart';
-
+import 'package:pbl_back/tap/calender/component/main_calender.dart';
+import 'package:pbl_back/tap/calender/component/schedule_bottom_sheet.dart';
+import 'package:pbl_back/tap/calender/component/prints.dart';
+import 'package:pbl_back/const/colors.dart';
+import 'package:pbl_back/tap/calender/component/event.dart';
+import 'package:pbl_back/tap/calender/component/alarm.dart';
+import 'package:pbl_back/services/supabase_calendar_service.dart';
+import 'package:pbl_back/tap/calender/board/board_page.dart';
 //<메인 화면(캘린더) 구상>
 
 class Calenderview extends StatefulWidget{
@@ -16,7 +17,10 @@ class Calenderview extends StatefulWidget{
 }
 
 class _CalenderviewState extends State<Calenderview>{
-  Map<Plan, bool> checked = {}; //체크박스
+  final CalendarService _calendarService = CalendarService();
+  List<Event> eventsList = [];
+  bool _isLoading = false;
+
 
   //선택된 날짜를 관리할 변수
   DateTime selectedDate=DateTime.utc(
@@ -25,31 +29,40 @@ class _CalenderviewState extends State<Calenderview>{
     DateTime.now().day,
   );
 
-  Map<DateTime,List<Event>> eventsMap={}; //날짜 별로 이벤트를 저장한 저장소
-
-  //페이지가 생성될 때 한번만 initSate() 생성
+  //페이지가 생성될 때 한번만 실행
   @override
   void initState() {
     super.initState();
-    generateGoals(eventsList);  //eventsMap 초기화
+    _loadEvents();
+  }
+
+  Future<void> _loadEvents() async {
+    setState(() => _isLoading = true);
+    try {
+      final events = await _calendarService.getGoals();
+      setState(() {
+        eventsList = events;
+      });
+    } catch (e) {
+      print("데이터 로드 실패: $e");
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   //모든 이벤트를 날짜별로 나눠서 eventsMap에 저장
   Map<DateTime,List<Event>> generateGoals(List<Event> events) {
     final Map<DateTime, List<Event>> map={};
 
-    //사용자의 이벤트 리스트를 순회
     for (var event in events) {
-      DateTime current = event.startDate;           //각 이벤트의 startDate(시작 날짜)를 current로 설정
-      //endDate(종료 날짜)까지 하루씩 반복
+      DateTime current = event.startDate;
       while (!current.isAfter(event.endDate)) {
-        final key = DateTime(current.year,current.month,current.day);         //current를 통일된 형식으로 key에 저장
+        final key = DateTime(current.year,current.month,current.day);
 
-        //key가 없다면 초기화
         if (!map.containsKey(key)) {
           map[key] = [];
         }
-        map[key]!.add(event);                 //위의 key를 eventsMap 인덱스로 사용해 이벤트를 값으로 저장
+        map[key]!.add(event);
         current = current.add(const Duration(days: 1));
       }
     }
@@ -59,13 +72,17 @@ class _CalenderviewState extends State<Calenderview>{
 
   @override
   Widget build(BuildContext context) {
+    // 로딩 중 표시 (데이터가 없을 때만)
+    if (_isLoading && eventsList.isEmpty) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
-    final TogetherGoals=eventsList.where((goal)=> (goal.togeter?.isNotEmpty?? false)).toList();
-    final SingleGoals=eventsList.where((goal)=> !(goal.togeter?.isNotEmpty?? false)).toList();
+    final TogetherGoals = eventsList.where((goal)=> (goal.togeter.isNotEmpty)).toList();
+    final SingleGoals = eventsList.where((goal)=> (goal.togeter.isEmpty)).toList();
 
-    final TogetherGoalsMap=generateGoals(TogetherGoals);
-    final SingleGoalsMap=generateGoals(SingleGoals);
-    final AllGoalsMap=generateGoals(eventsList);
+    final TogetherGoalsMap = generateGoals(TogetherGoals);
+    final SingleGoalsMap = generateGoals(SingleGoals);
+    final AllGoalsMap = generateGoals(eventsList);
 
     return DefaultTabController(
       length: 3,
@@ -75,12 +92,12 @@ class _CalenderviewState extends State<Calenderview>{
           //가로로 배치
           title: Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.calendar_month_rounded,
                 color: PRIMARY_COLOR,
               ),
-              SizedBox(width: 8),
-              Text(
+              const SizedBox(width: 8),
+              const Text(
                 "내캘린더",
                 style: TextStyle(
                   color: PRIMARY_COLOR,
@@ -89,7 +106,20 @@ class _CalenderviewState extends State<Calenderview>{
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              Spacer(),
+              const Spacer(),
+
+              IconButton(
+                onPressed:(){
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context)=> BoardPage()),
+                  );
+                },
+                icon: Icon(Icons.event_note_rounded, size: 25,color: POINT_COLOR,
+                ),
+              ),
+              SizedBox(width: 5),
+
               IconButton(
                 onPressed: (){
                   Navigator.push(
@@ -145,24 +175,20 @@ class _CalenderviewState extends State<Calenderview>{
               backgroundColor: PRIMARY_COLOR,
               onPressed: () async{
                 // 목표 설정에서 반환되는 값은 Event객체로 newGoal에 저장됨
-                final newGoal= await showModalBottomSheet<Event>(
+                final newGoal = await showModalBottomSheet<Event>(
                   context: context,
                   isScrollControlled: true,
                   backgroundColor: Colors.white,
                   builder: (context) => ScheduleBottomSheet(), // 기존 바텀시트 위젯
                 );
-                //위의 newGoal에 값이 있다면, Event 객체 리스트의 이벤트에 추가한 뒤, 재생성
-                if(newGoal!=null){
-                  setState(() {
-                    eventsList.add(newGoal);
-                    generateGoals(eventsList);
-                  });
+
+                if(newGoal != null){
+                  await _calendarService.addGoalWithTodos(newGoal);
+                  await _loadEvents();
                 }
               },
               shape: const CircleBorder(),  //둥근 모양
-
-              //이벤트(목표) 추가 버튼의 아이콘
-              child: Icon(
+              child: const Icon(
                 Icons.add,
                 color: Colors.white,
               ),
@@ -174,58 +200,56 @@ class _CalenderviewState extends State<Calenderview>{
   }
 
   Widget Calendar (List<Event> list, Map<DateTime,List<Event>> map){
-    return //기기의 하단 메뉴바 같은 시스템 UI를 피해서 구현
-      SafeArea(
-        //달력과 목표/계획의 리스트를 세로로 배치
-        child: Stack(
-          children: [
-            //'main_calender.dart'의 MainCalendar 위젯 배치
-            MainCalendar(
-              onDaySelected: (selectedDay, focusedDay) {  //날짜 선택 시 실행할 함수
-                setState(() {                             //상태 변경을 알리고 rebuild
-                  selectedDate = selectedDay;
-                });
-              },
-              selectedDate: selectedDate,                 //선택된 날짜
-              events: map,                          //각 탭에 해당되는 목표 데이터
-            ),
+    return SafeArea(
+      //달력과 목표/계획의 리스트를 세로로 배치
+      child: Stack(
+        children: [
+          //'main_calender.dart'의 MainCalendar 위젯 배치
+          MainCalendar(
+            onDaySelected: (selectedDay, focusedDay) {  //날짜 선택 시 실행할 함수
+              setState(() {                             //상태 변경을 알리고 rebuild
+                selectedDate = selectedDay;
+              });
+            },
+            selectedDate: selectedDate,                 //선택된 날짜
+            events: map,                          //각 탭에 해당되는 목표 데이터
+          ),
 
-            //Prints 위젯 배치
-            Positioned.fill(
-              child: DraggableScrollableSheet(
-                initialChildSize: 0.1,  //화면의 초기 크기
-                minChildSize: 0.1,      //최소 크기
-                maxChildSize: 0.9,        //최대 크기
-                builder: (context,scrollController)=>Prints(
-                  selectedDate: selectedDate,           //선택된 날짜
-                  eventsMap: map,                 //날짜 별로 이벤트를 저장한 저장소
-                  scrollController: scrollController,
-                  checked:checked,  //체크 여부
-                  //체크 여부 동기화 함수
-                  onChecked:(plan,value){
-                    setState(() {
-                      checked[plan]=value;
-                    });
-                  },
+          //Prints 위젯 배치
+          Positioned.fill(
+            child: DraggableScrollableSheet(
+              initialChildSize: 0.1,  //화면의 초기 크기
+              minChildSize: 0.1,      //최소 크기
+              maxChildSize: 0.9,        //최대 크기
+              builder: (context,scrollController)=>Prints(
+                selectedDate: selectedDate,           //선택된 날짜
+                eventsMap: map,                 //날짜 별로 이벤트를 저장한 저장소
+                scrollController: scrollController,
 
-                  //[이벤트 삭제, 계획 추가/삭제/수정] 명령 함수 => (이벤트 객체, {계획 객체,계획삭제여부(기본 F), 이벤트삭제여부(기본 F)})
-                  adddel: (Event event,{Plan? plan, bool removePlan=false ,bool removeEvent=false}) {
-                    setState(() {                                 //상태 변경을 알리고 rebuild
-                      if(removeEvent){                              //이벤트 삭제 여부가 True로, 이벤트(목표) 삭제
-                        eventsList.remove(event);
-                      }else if(removePlan&&plan!=null){             //계획 삭제 여부가 True로, 계획 삭제
-                        event.plans.remove(plan);
-                      }else if(plan!=null){                        //계획이 입력으로 들어오면, Event객체에 plan 추가/수정
-                        event.plans.add(plan);
-                      }
-                      generateGoals(eventsList);                            //이벤트 리스트를 다시 조회할 수 있도록 제생성
-                    });
-                  },
-                ),
+                onPlanUpdated: (Event event) async {
+                  await _calendarService.updateGoal(event);
+                  await _loadEvents();
+                },
+
+                adddel: (Event event,{Plan? plan, bool removePlan=false ,bool removeEvent=false}) async {
+                  if(removeEvent){
+                    if (event.id != null) {
+                      await _calendarService.deleteGoal(event.id!);
+                    }
+                  } else if(removePlan && plan != null){
+                    event.plans.remove(plan);
+                    await _calendarService.updateGoal(event);
+                  } else if(plan != null){
+                    event.plans.add(plan);
+                    await _calendarService.updateGoal(event);
+                  }
+                  await _loadEvents(); // 목록 갱신
+                },
               ),
             ),
-          ],
-        ),
-      );
+          ),
+        ],
+      ),
+    );
   }
 }
