@@ -148,14 +148,37 @@ class _RankingTapState extends State<RankingTap> {
           friendUidsSet.add(requesterId);
         }
       }
-      final List<String> friendUids = friendUidsSet.toList();
+      List<String> friendUids = [];
 
-      if (friendUids.isNotEmpty) {
+      if (friendUidsSet.isNotEmpty) {
+        final publishedFriendsData = await _supabase
+            .from('users')
+            .select('id')
+            .inFilter('id', friendUidsSet.toList())
+            .eq('is_ranking_public', true); // 공개 설정이 true인 친구만 필터링
+
+        friendUids.addAll(publishedFriendsData.map((e) => e['id'] as String));
+      }
+
+      final currentUserProfile = await _supabase
+          .from('users')
+          .select('is_ranking_public')
+          .eq('id', currentUserId)
+          .single();
+
+      final isCurrentUserRankingPublic =
+      currentUserProfile['is_ranking_public'] as bool;
+
+      if (isCurrentUserRankingPublic) { // 내가 공개했을 때만 나를 포함
+        friendUids.add(currentUserId);
+      }
+      final List<String> finalFriendUids = friendUids.toSet().toList(); // 중복 제거
+
+      if (finalFriendUids.isNotEmpty) {
         final friendRankingData = await _supabase
             .from('users')
             .select('id, nickname, level, exp, created_at, avatar_url')
-            .inFilter('id', friendUids) // 추출된 친구 ID 목록 사용
-            .eq('is_ranking_public', true)
+            .inFilter('id', finalFriendUids)
             .order('exp', ascending: false);
 
         fetchedFriends = friendRankingData.map((json) => RankUser.fromJson(json)).toList();
