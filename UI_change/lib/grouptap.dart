@@ -157,12 +157,13 @@ class _GroupGoalPageState extends State<GroupGoalPage> {
 
     showDialog(
       context: context,
-      barrierDismissible: false, // 외부 터치로 닫히는 것 방지 (선택 사항)
       builder: (BuildContext context) {
         return ConfettiDialog(goalName: goalName);
       },
     );
   }
+
+
 
   @override
   void initState() {
@@ -180,14 +181,14 @@ class _GroupGoalPageState extends State<GroupGoalPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[200],
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
         leading: const Icon(Icons.groups, size: 30),
         title: const Text("그룹",
           style: TextStyle(
             color: PRIMARY_COLOR,
             fontSize: 20,
-            fontFamily: 'Pretendard-Regular',
+            fontFamily: 'Pretendard',
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -204,21 +205,22 @@ class _GroupGoalPageState extends State<GroupGoalPage> {
               shrinkWrap: true,
               itemCount: goals.length,
               itemBuilder: (context, index) {
-                return GoalCard(
-                  goal: goals[index],
-                  // 목표를 탭하면 바로 개인 목표 달성률로 이동
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => GoalDetailPage(
-                            goal: goals[index],
-                            currentUser: currentUser // 현재 사용자 이름 전달
+                return
+                  GoalCard(
+                    goal: goals[index],
+                    // 목표를 탭하면 바로 개인 목표 달성률로 이동
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => GoalDetailPage(
+                              goal: goals[index],
+                              currentUser: currentUser // 현재 사용자 이름 전달
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                );
+                      );
+                    },
+                  );
               },
             ),
           ],
@@ -265,13 +267,14 @@ class GoalCard extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.check_circle_outline, color: Colors.blueGrey.shade700, size: 20),
+            Icon(Icons.check_circle_outline, color: PRIMARY_COLOR, size: 20),
             const SizedBox(width: 8),
             Text(
               "목표 완료됨",
               style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.blueGrey.shade700,
+                fontFamily: 'Pretendard',
+                fontWeight: FontWeight.w700,
+                color: PRIMARY_COLOR,
               ),
             ),
           ],
@@ -284,10 +287,11 @@ class GoalCard extends StatelessWidget {
     return Column(
       children: [
         Container(
-          margin: const EdgeInsets.symmetric(vertical: 5.0,horizontal: 5),
+          margin: const EdgeInsets.symmetric(vertical: 10.0,horizontal: 15),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(5),
+            border: Border.all(color:Colors.white10)
           ),
           child: InkWell(
             onTap: onTap,
@@ -302,7 +306,7 @@ class GoalCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 15,
                       color: Colors.black54,
-                      fontFamily: 'Pretendard-Medium',
+                      fontFamily: 'Pretendard',
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -313,8 +317,8 @@ class GoalCard extends StatelessWidget {
                         goal.name,
                         style: const TextStyle(
                           fontSize: 18,
-                          fontFamily: 'Pretendard-Bold',
-                          fontWeight: FontWeight.w500,
+                          fontFamily: 'Pretendard',
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(width: 70),
@@ -361,11 +365,11 @@ class GoalDetailPage extends StatelessWidget {
           style: TextStyle(
             color: PRIMARY_COLOR,
             fontSize: 20,
-            fontFamily: 'Pretendard-Regular',
+            fontFamily: 'Pretendard',
             fontWeight: FontWeight.w700,
           ),
         ),
-        toolbarHeight: 60.0,
+        toolbarHeight: 50.0,
         backgroundColor: Colors.white, // 이미지의 상단 바 색상
 
       ),
@@ -383,7 +387,7 @@ class GoalDetailPage extends StatelessWidget {
                     goal.name,
                     style: const TextStyle(
                       fontSize: 20,
-                      fontFamily: 'Pretendard-SemiBold',
+                      fontFamily: 'Pretendard',
                       fontWeight: FontWeight.w700,
                       color: Colors.black87,
                     ),
@@ -398,16 +402,20 @@ class GoalDetailPage extends StatelessWidget {
                       children: [
                         Tooltip(
                           preferBelow: false,
-                          verticalOffset: -70,
+                          verticalOffset: -150,
                           padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
                           triggerMode: TooltipTriggerMode.tap,
                           decoration: BoxDecoration(
                             color: Colors.grey,
                             borderRadius: const BorderRadius.all(Radius.circular(10)),
                           ),
-                          message: "그룹내 팀원의 달성률에 따른 그룹 차등 보상 \n 세부 게획 수에 따른 경험치 설명",
+                          message: "• 개인 보상: 세부 계획 개수에 따라 경험치 추가 \n "
+                              "e.g 10개:+5 | 20개:+10 | 30개:+15 | 40개:+20 | 50개:+25)\n"
+                              "\n • 그룹 보상: 그룹 평균 달성률에 따라 경험치 추가 \n"
+                              "e.g 60%:+10 | 70%:+20 | 80%:+30 | 90%:+40 | 100%:+50",
                           textStyle: TextStyle(
-                            fontSize: 13,
+                            fontSize: 15,
+                            fontFamily: 'Pretendard',
                             fontWeight: FontWeight.w500,
                             color: Colors.white,
                           ),
@@ -421,8 +429,8 @@ class GoalDetailPage extends StatelessWidget {
                         Text(
                           '참가 중인 인원: ${goal.participants.length}명',
                           style: const TextStyle(
-                            fontSize: 14,
-                            fontFamily: 'Pretendard-Medium',
+                            fontSize: 15,
+                            fontFamily: 'Pretendard',
                             fontWeight: FontWeight.w500,
                             color: Colors.black54,
                           ),
@@ -476,15 +484,21 @@ class GoalDetailPage extends StatelessWidget {
                                     children: [
                                       Text(
                                         userName, // 닉네임
-                                        style: const TextStyle(fontSize: 16,
-                                            fontWeight: FontWeight.bold),
+                                        style: const TextStyle(
+                                          fontFamily: 'Pretendard',
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700
+                                        ),
                                       ),
                                       const SizedBox(height: 4),
                                       // 완료된 세부 계획 수 표시
                                       Text(
                                         '완료: $completedCount / ${goal.totalSubTasks}개',
-                                        style: const TextStyle(fontSize: 12,
-                                            color: Colors.blueGrey),
+                                        style: const TextStyle(
+                                          fontFamily: 'Pretendard',
+                                          fontSize: 12,
+                                          color: Colors.blueGrey
+                                        ),
                                       ),
                                       const SizedBox(height: 4),
 
@@ -492,17 +506,26 @@ class GoalDetailPage extends StatelessWidget {
                                       Row(
                                         children: [
                                           Expanded(
-                                              flex: 3,
-                                              child: Text('최근 수행한 계획 or \n 수행할 계획')
+                                            flex: 3,
+                                            child: LinearProgressIndicator(
+                                              value: normalizedRate,
+                                              backgroundColor: Colors.grey[200],
+                                              color: percentage >= 100
+                                                  ? Colors.black54
+                                                  : Colors.grey,
+                                              minHeight: 8,
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
                                           ),
                                           const SizedBox(width: 8),
                                           // 달성률 텍스트
                                           Expanded(
                                             flex: 1,
-                                            child:Text( percentage==100?
-                                            "$percentage%": "",
+                                            child:Text(
+                                              "$percentage%",
                                               style: TextStyle(
-                                                fontSize: 16,
+                                                fontFamily: 'Pretendard',
+                                                fontSize: 15,
                                                 fontWeight: FontWeight.w700,
                                                 color: percentage >= 100 ? Colors
                                                     .black87 : Colors.grey[700],
@@ -519,29 +542,20 @@ class GoalDetailPage extends StatelessWidget {
                                 // 독촉하기 버튼
                                 // isCurrentUser 변수를 사용하여 현재 사용자가 아닐 때+달성률이 100(목표완료)가 아닐때 버튼을 표시
                                 if (!isCurrentUser&&percentage!=100)
-                                  ElevatedButton(
-                                    onPressed: () => _nudge(userName, completedCount, goal.totalSubTasks),
-                                    style: ElevatedButton.styleFrom(
-                                      foregroundColor: Colors.red,
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(3),
-                                          side: BorderSide(color: Colors.red)
+                                  Column(
+                                    children: [
+                                      IconButton(
+                                        onPressed: () => _nudge(userName, completedCount, goal.totalSubTasks),
+                                        icon: const Icon(Icons.local_fire_department_sharp),iconSize: 30, color: Colors.red,
                                       ),
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10, vertical: 8),
-                                    ),
-                                    child: const Text(
-                                      "독촉하기",
-                                      style: TextStyle(
-                                        fontSize: 14, fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
+                                      Text('Hurry Up', style: TextStyle( fontFamily: 'Pretendard', fontWeight: FontWeight.w400, fontSize: 12),)
+                                    ],
+                                  )
+
                               ],
                             ),
                           ),
                         ),
-                        SizedBox(height: 80),
                       ],
                     )
                 );
@@ -618,7 +632,6 @@ class _ConfettiDialogState extends State<ConfettiDialog> {
           ),
         ),
 
-        // 2. 기존의 AlertDialog 위젯
         AlertDialog(
           backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(
@@ -684,6 +697,7 @@ class _ConfettiDialogState extends State<ConfettiDialog> {
           ],
           actionsAlignment: MainAxisAlignment.center, // 버튼 중앙 정렬
         ),
+        SizedBox(height: 80,),
       ],
     );
   }
