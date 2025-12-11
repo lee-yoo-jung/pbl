@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:pbl_back/tap/calender/component/main_calender.dart';
-import 'package:pbl_back/tap/calender/component/schedule_bottom_sheet.dart';
-import 'package:pbl_back/tap/calender/component/prints.dart';
-import 'package:pbl_back/const/colors.dart';
-import 'package:pbl_back/tap/calender/component/event.dart';
-import 'package:pbl_back/tap/calender/component/alarm.dart';
-import 'package:pbl_back/services/supabase_calendar_service.dart';
-import 'package:pbl_back/tap/calender/board/board_page.dart';
+import 'package:pbl/tap/calender/component/main_calender.dart';
+import 'package:pbl/tap/calender/component/schedule_bottom_sheet.dart';
+import 'package:pbl/tap/calender/component/prints.dart';
+import 'package:pbl/const/colors.dart';
+import 'package:pbl/tap/calender/component/event.dart';
+import 'package:pbl/tap/calender/component/alarm.dart';
+import 'package:pbl/services/supabase_calendar_service.dart';
+import 'package:pbl/tap/calender/board/board_page.dart';
+import 'package:pbl/services/badge_service.dart';
+import 'package:pbl/services/level_service.dart';
+
 //<메인 화면(캘린더) 구상>
 
 class Calenderview extends StatefulWidget{
@@ -167,7 +170,7 @@ class _CalenderviewState extends State<Calenderview>{
 
         //이벤트(목표) 추가 버튼
         floatingActionButton: Padding(
-          padding: const EdgeInsets.only(bottom: 70),
+          padding: const EdgeInsets.only(bottom: 100),
           child: SizedBox(
             width: 45,
             height: 45,
@@ -227,22 +230,89 @@ class _CalenderviewState extends State<Calenderview>{
                 scrollController: scrollController,
 
                 onPlanUpdated: (Event event) async {
+                  // DB 업데이트
                   await _calendarService.updateGoal(event);
+
+                  // 뱃지 & 레벨업 로직
+                  if (context.mounted && event.id != null) {
+
+                    // 꾸준이 & 성실이 체크
+                    await BadgeService().checkSteadyBadge(context, event.id!);
+
+                    int total = event.plans.length;
+                    int done = event.plans.where((p) => p.isDone).length;
+
+                    if (total > 0) {
+                      double rate = done / total;
+                      await BadgeService().checkSincereBadge(context, rate);
+                    }
+
+                    bool isShared = event.togeter.isNotEmpty;
+
+                    // 사진 인증 여부
+                    bool hasPhoto = false;
+
+                    await LevelService().grantExpForPlanCompletion(
+                        context,
+                        goalId: event.id!,
+                        isPhotoVerified: hasPhoto,
+                        isSharedGoal: isShared
+                    );
+                  }
+
+                  // 화면 갱신
                   await _loadEvents();
                 },
 
-                adddel: (Event event,{Plan? plan, bool removePlan=false ,bool removeEvent=false}) async {
-                  if(removeEvent){
+                adddel: (Event event, {Plan? plan, bool removePlan = false, bool removeEvent = false}) async {
+
+                  // 목표(Event) 자체 삭제
+                  if (removeEvent) {
                     if (event.id != null) {
                       await _calendarService.deleteGoal(event.id!);
                     }
-                  } else if(removePlan && plan != null){
+                  }
+
+                  // 세부 계획(Plan) 삭제
+                  else if (removePlan && plan != null) {
+
+                    if (plan.id != null) {
+                      // 공유 목표인지 확인 (togeter 리스트가 있으면 공유 목표)
+                      bool isShared = event.togeter.isNotEmpty;
+
+                      await _calendarService.deletePlan(plan.id!, isShared: isShared);
+                    }
+
                     event.plans.remove(plan);
-                    await _calendarService.updateGoal(event);
-                  } else if(plan != null){
+
+                  }
+                  // 세부 계획(Plan) 추가 시도
+                  else if (plan != null) {
+
+                    // 날짜 비교 로직 추가
+                    final now = DateTime.now();
+                    final today = DateTime(now.year, now.month, now.day);
+
+                    // 목표의 종료일(endDate)과 오늘을 비교
+                    // endDate가 오늘보다 이전이면(과거라면) 추가 금지
+                    if (event.endDate.isBefore(today)) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("기간이 종료된 목표에는 계획을 추가할 수 없습니다."),
+                            duration: Duration(seconds: 1),
+                            backgroundColor: Colors.redAccent, // 경고 느낌을 위해 빨간색 추천
+                          ),
+                        );
+                      }
+                      return; // 여기서 함수 강제 종료
+                    }
+
+                    // 기간이 지나지 않았다면 정상적으로 추가 진행
                     event.plans.add(plan);
                     await _calendarService.updateGoal(event);
                   }
+
                   await _loadEvents(); // 목록 갱신
                 },
               ),

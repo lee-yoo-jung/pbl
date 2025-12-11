@@ -194,130 +194,132 @@ class TreeState extends State<Tree> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    return Container(
-      decoration: BoxDecoration(
-        image: DecorationImage(
-          fit: BoxFit.cover,
-          image: const AssetImage('assets/images/tree1.png'), // 배경 이미지
-        ),
-      ),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: const Text('나무 키우기'),
-          backgroundColor: Colors.transparent,),
-        body: Column(
-          children: [
-            const SizedBox(height: 180),
-            Center(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 600),
-                transitionBuilder: (Widget child, Animation<double> animation) {
-                  return FadeTransition(
-                    opacity: animation,
-                    child: ScaleTransition(
-                      scale: Tween(begin: 0.9, end: 1.0).animate(animation),
-                      child: child,
+    return SafeArea(
+        child: Container(
+          decoration: BoxDecoration(
+            image: DecorationImage(
+              fit: BoxFit.cover,
+              image: const AssetImage('assets/images/tree1.png'), // 배경 이미지
+            ),
+          ),
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              title: const Text('나무 키우기'),
+              backgroundColor: Colors.transparent,),
+            body: Column(
+              children: [
+                const SizedBox(height: 170),
+                Center(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 600),
+                    transitionBuilder: (Widget child, Animation<double> animation) {
+                      return FadeTransition(
+                        opacity: animation,
+                        child: ScaleTransition(
+                          scale: Tween(begin: 0.9, end: 1.0).animate(animation),
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: stage > 0
+                        ? Image.asset(
+                      treeImages[stage - 1],
+                      key: ValueKey(stage),
+                      width: 240,
+                    )
+                        : const SizedBox(
+                      width: 200,
+                      height: 300,
                     ),
-                  );
-                },
-                child: stage > 0
-                    ? Image.asset(
-                  treeImages[stage - 1],
-                  key: ValueKey(stage),
-                  width: 300,
-                )
-                    : const SizedBox(
-                  width: 200,
-                  height: 375,
+                  ),
                 ),
-              ),
-            ),
 
-            // 5. 달성률 반영 부분
-            Padding(
-              padding: const EdgeInsets.only(
-                  left: 50, right: 50, bottom: 10, top: 50),
-              child: LinearProgressIndicator(
-                value: achievementRate,
-                backgroundColor: Colors.grey[200],
-                color: Colors.green,
-                minHeight: 15,
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-
-            // 달성률 텍스트 반영
-            Text(
-              '${(achievementRate * 100).toInt()}%',
-              style: const TextStyle(fontSize: 20, color: Colors.white),
-            ),
-
-            const SizedBox(height: 10),
-
-            // 6. 성장시키기 버튼 (DB 저장 로직 포함)
-            ElevatedButton(
-              onPressed: () async {
-                // DB 연결 및 목표 ID 유효성 검사
-                if (supabase.auth.currentUser?.id == null || currentGoalId == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('사용자 또는 목표 정보가 없어 성장을 저장할 수 없습니다.')),
-                  );
-                  return;
-                }
-
-                int maxS = MaxStage((achievementRate * 100).toInt());
-
-                if (stage < maxS) {
-                  final newStage = stage + 1;
-
-                  try {
-                    // goals 테이블에 새로운 stage 값을 저장
-                    await supabase
-                        .from('goals')
-                        .update({'tree_stage': newStage}) // goals 테이블 업데이트
-                        .eq('id', currentGoalId!); // 상태 변수를 사용하여 해당 목표만 업데이트
-
-                    setState(() {
-                      stage = newStage; // DB 업데이트 성공 후 로컬 상태 업데이트
-                    });
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('성장 단계 저장에 실패했습니다. (DB 권한 확인)')),
-                    );
-                    print("DB Update Error: $e");
-                  }
-
-                } else if (stage == 7) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('나무가 최종 단계에 도달했습니다!'),
-                      duration: Duration(milliseconds: 1500),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('현재 달성률 ${(achievementRate * 100).toInt()}%로는 더 이상 성장할 수 없습니다.'),
-                      duration: Duration(milliseconds: 1500),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+                // 5. 달성률 반영 부분
+                Padding(
+                  padding: const EdgeInsets.only(
+                      left: 50, right: 50, bottom: 10, top: 5),
+                  child: LinearProgressIndicator(
+                    value: achievementRate,
+                    backgroundColor: Colors.grey[200],
+                    color: Colors.green,
+                    minHeight: 15,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
-              ),
-              child: const Text('성장시키기', style: TextStyle(fontSize: 18),),
+
+                // 달성률 텍스트 반영
+                Text(
+                  '${(achievementRate * 100).toInt()}%',
+                  style: const TextStyle(fontSize: 20, color: Colors.white),
+                ),
+
+                const SizedBox(height: 0),
+
+                // 6. 성장시키기 버튼 (DB 저장 로직 포함)
+                ElevatedButton(
+                  onPressed: () async {
+                    // DB 연결 및 목표 ID 유효성 검사
+                    if (supabase.auth.currentUser?.id == null || currentGoalId == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('사용자 또는 목표 정보가 없어 성장을 저장할 수 없습니다.')),
+                      );
+                      return;
+                    }
+
+                    int maxS = MaxStage((achievementRate * 100).toInt());
+
+                    if (stage < maxS) {
+                      final newStage = stage + 1;
+
+                      try {
+                        // goals 테이블에 새로운 stage 값을 저장
+                        await supabase
+                            .from('goals')
+                            .update({'tree_stage': newStage}) // goals 테이블 업데이트
+                            .eq('id', currentGoalId!); // 상태 변수를 사용하여 해당 목표만 업데이트
+
+                        setState(() {
+                          stage = newStage; // DB 업데이트 성공 후 로컬 상태 업데이트
+                        });
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('성장 단계 저장에 실패했습니다. (DB 권한 확인)')),
+                        );
+                        print("DB Update Error: $e");
+                      }
+
+                    } else if (stage == 7) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('나무가 최종 단계에 도달했습니다!'),
+                          duration: Duration(milliseconds: 1500),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('현재 달성률 ${(achievementRate * 100).toInt()}%로는 더 이상 성장할 수 없습니다.'),
+                          duration: Duration(milliseconds: 1500),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                  child: const Text('성장시키기', style: TextStyle(fontSize: 18),),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        )
     );
   }
 }

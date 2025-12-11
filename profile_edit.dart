@@ -1,24 +1,36 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-
-// 뱃지 데이터 모델
+// 뱃지
 class UserBadge {
   final String id;
   final String name;
-  final String assetPath; // 뱃지 이미지 파일 경로
+  final String assetPath;
   final String description;
+  final bool isAcquired;
 
   UserBadge({
     required this.id,
     required this.name,
     required this.assetPath,
     required this.description,
+    this.isAcquired = false,
   });
+
+  factory UserBadge.fromJson(Map<String, dynamic> json, {bool isAcquired = false}) {
+    return UserBadge(
+      id: json['id'].toString(),
+      name: json['name'] ?? '',
+      assetPath: json['image_path'] ?? '',
+      description: json['description'] ?? '',
+      isAcquired: isAcquired,
+    );
+  }
 }
 
-// 편집된 데이터 반환 모델
+// 편집 완료 후 반환 데이터
 class ProfileEditData {
   final String nickname;
   final String? profileImagePath;
@@ -33,7 +45,6 @@ class ProfileEditData {
 
 class ProfileEditUI extends StatefulWidget {
   final Function(ProfileEditData data)? onSave;
-  // 초기값
   final String initialNickname;
   final String initialImagePath;
   final UserBadge? initialSelectedBadge;
@@ -41,8 +52,8 @@ class ProfileEditUI extends StatefulWidget {
   const ProfileEditUI({
     super.key,
     this.onSave,
-    this.initialNickname = '사용자 닉네임',
-    this.initialImagePath = 'assets/profile.jpg',
+    this.initialNickname = '',
+    this.initialImagePath = 'assets/images/profile.jpg',
     this.initialSelectedBadge,
   });
 
@@ -51,27 +62,23 @@ class ProfileEditUI extends StatefulWidget {
 }
 
 class _ProfileEditUIState extends State<ProfileEditUI> {
+  final supabase = Supabase.instance.client;
   final ImagePicker _picker = ImagePicker();
+
   late TextEditingController _nicknameController;
 
+  bool _isLoading = true;
+  String? _serverProfileImageUrl;
   String? _newProfileImagePath;
   UserBadge? _selectedBadge;
 
-  // 테스트용 뱃지 목록 (assetPath를 assets 폴더의 실제 파일 경로로 지정)
-  final List<UserBadge> _availableBadges = [
-    UserBadge(id: '1', name: '응원왕', assetPath: 'assets/images/badge1.jpg', description: '50번 응원하기'),
-    UserBadge(id: '2', name: '성실이', assetPath: 'assets/images/badge2.jpg', description: '연속 100% 달성'),
-    UserBadge(id: '3', name: '인기스타', assetPath: 'assets/images/badge3.jpg', description: '20번 응원받기'),
-    UserBadge(id: '4', name: '꾸준이', assetPath: 'assets/images/badge4.jpg', description: '한 목표에서 체크된 계획 20개'),
-  ];
+  List<UserBadge> _myBadges = [];
 
   @override
   void initState() {
     super.initState();
     _nicknameController = TextEditingController(text: widget.initialNickname);
-
-    // 초기값이 없으면 null로 설정하여 "뱃지 없음" 상태 유지
-    _selectedBadge = widget.initialSelectedBadge;
+    _initializeData();
   }
 
   @override
@@ -80,15 +87,167 @@ class _ProfileEditUIState extends State<ProfileEditUI> {
     super.dispose();
   }
 
+  // 데이터 로드 통합 함수
+  Future<void> _initializeData() async {
+    setState(() => _isLoading = true);
+    await _loadUserBadges();
+    await _loadUserProfile();
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  // 내가 획득한 뱃지 목록 가져오기
+  Future<void> _loadUserBadges() async {
+    try {
+      final userId = supabase.auth.currentUser!.id;
+
+      final response = await supabase
+          .from('user_badges')
+          .select('badges(id, name, image_path, description)')
+          .eq('user_id', userId);
+
+      final List<UserBadge> loadedBadges = [];
+      for (var item in response) {
+        final badgeData = item['badges'];
+        if (badgeData != null) {
+          loadedBadges.add(UserBadge.fromJson(badgeData, isAcquired: true));
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _myBadges = loadedBadges;
+        });
+      }
+    } catch (e) {
+      debugPrint('뱃지 목록 로드 실패: $e');
+    }
+  }
+
+  // 내 프로필 정보 로드
+  Future<void> _loadUserProfile() async {
+    try {
+      final userId = supabase.auth.currentUser!.id;
+
+      final data = await supabase
+          .from('users')
+          .select('nickname, avatar_url, badge_id')
+          .eq('id', userId)
+          .single();
+
+      if (mounted) {
+        setState(() {
+          _nicknameController.text = data['nickname'] ?? '';
+          _serverProfileImageUrl = data['avatar_url'];
+
+          // 장착 중인 뱃지 찾기
+          if (data['badge_id'] != null) {
+            final currentBadgeId = data['badge_id'].toString();
+            try {
+              // _myBadges 리스트에서 찾아서 설정
+              _selectedBadge = _myBadges.firstWhere(
+                    (b) => b.id == currentBadgeId,
+              );
+            } catch (e) {
+              _selectedBadge = null;
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('프로필 로드 실패: $e');
+    }
+  }
+
+  // 이미지 업로드 함수
+  Future<String?> _uploadImage(String filePath) async {
+    try {
+      final userId = supabase.auth.currentUser!.id;
+      final file = File(filePath);
+      final fileExt = filePath.split('.').last;
+      final fileName = '$userId/profile_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+
+      await supabase.storage.from('profiles').upload(
+        fileName,
+        file,
+        fileOptions: const FileOptions(upsert: true),
+      );
+
+      final imageUrl = supabase.storage.from('profiles').getPublicUrl(fileName);
+      return imageUrl;
+    } catch (e) {
+      debugPrint('이미지 업로드 실패: $e');
+      throw Exception('이미지 업로드 중 오류가 발생했습니다.');
+    }
+  }
+
+  // 저장 버튼 핸들러
+  Future<void> _handleSave() async {
+    final newNickname = _nicknameController.text.trim();
+
+    if (newNickname.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('닉네임을 입력해주세요.')),
+        );
+      }
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final userId = supabase.auth.currentUser!.id;
+      String? finalImageUrl = _serverProfileImageUrl;
+
+      // 새 이미지가 있다면 업로드
+      if (_newProfileImagePath != null) {
+        final uploadedUrl = await _uploadImage(_newProfileImagePath!);
+        if (uploadedUrl != null) {
+          finalImageUrl = uploadedUrl;
+        }
+      }
+
+      // DB 업데이트
+      await supabase.from('users').update({
+        'nickname': newNickname,
+        'avatar_url': finalImageUrl,
+        'badge_id': _selectedBadge?.id != null ? int.parse(_selectedBadge!.id) : null, // String ID -> Int 변환 주의
+      }).eq('id', userId);
+
+      // 완료 처리
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('프로필이 저장되었습니다.')),
+        );
+
+        final data = ProfileEditData(
+          nickname: _nicknameController.text,
+          profileImagePath: finalImageUrl,
+          selectedBadge: _selectedBadge,
+        );
+        widget.onSave?.call(data);
+
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      debugPrint('저장 실패 상세: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('저장 실패: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _pickImage(ImageSource source) async {
     final XFile? pickedFile = await _picker.pickImage(source: source);
-
     if (pickedFile != null) {
       setState(() {
         _newProfileImagePath = pickedFile.path;
       });
     }
-
     if (mounted) Navigator.pop(context);
   }
 
@@ -117,20 +276,20 @@ class _ProfileEditUIState extends State<ProfileEditUI> {
     );
   }
 
-  // 뱃지 선택 다이얼로그
+  // 뱃지 선택 다이얼로그 (획득한 뱃지만 표시)
   void _showBadgeSelectionDialog() {
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('뱃지 선택'),
+          title: const Text('보유 뱃지 목록'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 뱃지 없음 옵션
+                // 뱃지 해제 옵션
                 RadioListTile<UserBadge?>(
-                  title: const Text('뱃지 없음'),
+                  title: const Text('장착 해제'),
                   value: null,
                   groupValue: _selectedBadge,
                   onChanged: (value) {
@@ -138,27 +297,34 @@ class _ProfileEditUIState extends State<ProfileEditUI> {
                     Navigator.pop(context);
                   },
                 ),
-                // 뱃지 목록
-                ..._availableBadges.map((badge) {
-                  return RadioListTile<UserBadge>(
-                    title: Text(badge.name),
-                    subtitle: Text(badge.description),
-                    value: badge,
-                    groupValue: _selectedBadge,
-                    onChanged: (value) {
-                      setState(() => _selectedBadge = value);
-                      Navigator.pop(context);
-                    },
-                    // Image.asset을 사용하여 그림 표시
-                    secondary: Image.asset(
-                      badge.assetPath,
-                      width: 32,
-                      height: 32,
-                      errorBuilder: (context, error, stackTrace) =>
-                      const Icon(Icons.error_outline, size: 32),
-                    ),
-                  );
-                }).toList(),
+                const Divider(),
+
+                // 획득한 뱃지 목록 표시
+                if (_myBadges.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Text("획득한 뱃지가 없습니다.\n열심히 활동해서 뱃지를 모아보세요!", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+                  )
+                else
+                  ..._myBadges.map((badge) {
+                    return RadioListTile<UserBadge>(
+                      title: Text(badge.name),
+                      subtitle: Text(badge.description, style: const TextStyle(fontSize: 12)),
+                      value: badge,
+                      groupValue: _selectedBadge,
+                      onChanged: (value) {
+                        setState(() => _selectedBadge = value);
+                        Navigator.pop(context);
+                      },
+                      secondary: Image.asset(
+                        badge.assetPath,
+                        width: 40,
+                        height: 40,
+                        errorBuilder: (context, error, stackTrace) =>
+                        const Icon(Icons.stars, size: 40, color: Colors.amber),
+                      ),
+                    );
+                  }).toList(),
               ],
             ),
           ),
@@ -173,29 +339,30 @@ class _ProfileEditUIState extends State<ProfileEditUI> {
     );
   }
 
-  void _handleSave() {
-    final data = ProfileEditData(
-      nickname: _nicknameController.text,
-      profileImagePath: _newProfileImagePath,
-      selectedBadge: _selectedBadge,
-    );
-
-    widget.onSave?.call(data);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('프로필 편집'),
         actions: [
-          TextButton(
+          _isLoading
+              ? const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: SizedBox(
+                width: 16, height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black)
+            ),
+          )
+              : TextButton(
             onPressed: _handleSave,
             child: const Text('저장', style: TextStyle(color: Colors.black)),
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator()) // 로딩 중일 때 표시
+          : SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: <Widget>[
@@ -211,23 +378,13 @@ class _ProfileEditUIState extends State<ProfileEditUI> {
   }
 
   Widget _buildProfileImageSection() {
-    final String currentImagePath =
-        _newProfileImagePath ?? widget.initialImagePath;
-    final bool isLocal = currentImagePath.startsWith('/');
-    final bool exists = isLocal && File(currentImagePath).existsSync();
-
-    Widget img;
-    if (exists) {
-      img = Image.file(File(currentImagePath), fit: BoxFit.cover);
-    } else if (currentImagePath.startsWith('http')) {
-      img = Image.network(currentImagePath, fit: BoxFit.cover);
+    ImageProvider? imageProvider;
+    if (_newProfileImagePath != null) {
+      imageProvider = FileImage(File(_newProfileImagePath!));
+    } else if (_serverProfileImageUrl != null && _serverProfileImageUrl!.isNotEmpty) {
+      imageProvider = NetworkImage(_serverProfileImageUrl!);
     } else {
-      img = Image.asset(
-        widget.initialImagePath,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) =>
-        const Icon(Icons.person, size: 70),
-      );
+      imageProvider = const AssetImage('assets/images/profile.jpg');
     }
 
     return Stack(
@@ -235,9 +392,8 @@ class _ProfileEditUIState extends State<ProfileEditUI> {
         CircleAvatar(
           radius: 60,
           backgroundColor: Colors.grey[200],
-          child: ClipOval(
-            child: SizedBox(width: 120, height: 120, child: img),
-          ),
+          backgroundImage: imageProvider,
+          child: imageProvider == null ? const Icon(Icons.person, size: 70) : null,
         ),
         Positioned(
           bottom: 0,
@@ -260,8 +416,7 @@ class _ProfileEditUIState extends State<ProfileEditUI> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('닉네임',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const Text('닉네임', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         TextField(
           controller: _nicknameController,
@@ -278,31 +433,29 @@ class _ProfileEditUIState extends State<ProfileEditUI> {
     );
   }
 
-  // 뱃지 표시 섹션 수정
   Widget _buildBadgeSection() {
     final badge = _selectedBadge;
 
-    // 리딩 위젯: 뱃지가 선택되었으면 Image.asset, 아니면 기본 아이콘
     final leadingWidget = badge != null
         ? Image.asset(
       badge.assetPath,
-      width: 30, // 크기 조정
-      height: 30, // 크기 조정
+      width: 40,
+      height: 40,
       errorBuilder: (context, error, stackTrace) =>
-      const Icon(Icons.image_not_supported, size: 30),
+      const Icon(Icons.stars, size: 40, color: Colors.amber),
     )
-        : const Icon(Icons.clear, size: 30);
+        : const Icon(Icons.add_circle_outline, size: 40, color: Colors.grey);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('전시할 뱃지',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const Text('대표 뱃지 설정', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         ListTile(
           title: Text(badge?.name ?? '선택된 뱃지 없음'),
           subtitle: Text(
-            badge?.description ?? '프로필에 전시할 뱃지를 선택하세요.',
+            badge?.description ?? '보유한 뱃지 중 하나를 선택해 프로필에 뽐내보세요!',
+            style: TextStyle(color: badge == null ? Colors.grey : Colors.black87),
           ),
           leading: leadingWidget,
           trailing: const Icon(Icons.edit),
@@ -311,6 +464,7 @@ class _ProfileEditUIState extends State<ProfileEditUI> {
             borderRadius: BorderRadius.circular(8),
             side: BorderSide(color: Colors.grey.shade300),
           ),
+          tileColor: Colors.white,
         ),
       ],
     );

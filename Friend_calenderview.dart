@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:pbl/tap/calender/component/main_calender.dart';
-import 'package:pbl/tap/calender/component/schedule_bottom_sheet.dart';
 import 'package:pbl/tap/calender/component/prints.dart';
 import 'package:pbl/const/colors.dart';
 import 'package:pbl/tap/calender/component/event.dart';
 import 'package:pbl/tap/friend/friendtap.dart';
+import 'package:pbl/services/supabase_calendar_service.dart';
 
 //<메인 화면(캘린더) 구상>
 
 class FriendCalenderview extends StatefulWidget{
-  final String? friendname;  //친구 이름
+  final Friend friend;
 
-  FriendCalenderview({
-    required this.friendname,
+  const FriendCalenderview({
+    required this.friend,
     Key? key,
   }):super(key:key);
 
@@ -21,7 +21,9 @@ class FriendCalenderview extends StatefulWidget{
 }
 
 class _FriendCalenderviewState extends State<FriendCalenderview>{
-  Map<Plan, bool> checked = {}; //체크박스
+  final CalendarService _calendarService = CalendarService();
+  List<Event> eventsList = [];
+  bool _isLoading = false;
 
   //선택된 날짜를 관리할 변수
   DateTime selectedDate=DateTime.utc(
@@ -30,13 +32,26 @@ class _FriendCalenderviewState extends State<FriendCalenderview>{
     DateTime.now().day,
   );
 
-  Map<DateTime,List<Event>> eventsMap={}; //날짜 별로 이벤트를 저장한 저장소
-
   //페이지가 생성될 때 한번만 initSate() 생성
   @override
   void initState() {
     super.initState();
-    generateGoals(eventsList);  //eventsMap 초기화
+    _loadFriendEvents(); // 앱 시작 시 친구 데이터 가져오기
+  }
+
+  Future<void> _loadFriendEvents() async {
+    setState(() => _isLoading = true);
+    try {
+      // 서비스에 추가한 getFriendGoals 호출
+      final events = await _calendarService.getFriendGoals(widget.friend.uid);
+      setState(() {
+        eventsList = events;
+      });
+    } catch (e) {
+      print("친구 데이터 로드 실패: $e");
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   //모든 이벤트를 날짜별로 나눠서 eventsMap에 저장
@@ -61,57 +76,70 @@ class _FriendCalenderviewState extends State<FriendCalenderview>{
     return map;
   }
 
+  void _showReadOnlyMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('친구의 일정은 수정할 수 없습니다.'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final TogetherGoals=eventsList.where((goal)=> (goal.togeter?.isNotEmpty?? false)).toList();
-    final SingleGoals=eventsList.where((goal)=> !(goal.togeter?.isNotEmpty?? false)).toList();
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    final TogetherGoals=eventsList.where((goal)=> (goal.togeter.isNotEmpty)).toList();
+    final SingleGoals=eventsList.where((goal)=> (goal.togeter.isEmpty)).toList();
 
     final TogetherGoalsMap=generateGoals(TogetherGoals);
     final SingleGoalsMap=generateGoals(SingleGoals);
     final AllGoalsMap=generateGoals(eventsList);
 
     return DefaultTabController(
-        length: 3,
-        child: Scaffold(  //상단 앱바
-          appBar: AppBar(
+      length: 3,
+      child: Scaffold(  //상단 앱바
+        appBar: AppBar(
           backgroundColor: Colors.white,
           //가로로 배치
           title: Row(
             children: [
-              Text("${widget.friendname} 캘린더",
-              style: TextStyle(
-                color: PRIMARY_COLOR,
-                fontSize: 18,
-                fontFamily: 'Pretendard',
-                fontWeight: FontWeight.w700,
+              Text("${widget.friend.nickname}님의 캘린더",
+                style: TextStyle(
+                  color: PRIMARY_COLOR,
+                  fontSize: 18,
+                  fontFamily: 'Pretendard',
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-            Spacer(),
-          ],
-        ),
-        toolbarHeight: 60.0,  //앱바의 높이 지정
-        bottom: PreferredSize(
+              Spacer(),
+            ],
+          ),
+          toolbarHeight: 60.0,  //앱바의 높이 지정
+          bottom: PreferredSize(
             preferredSize: const Size.fromHeight(kToolbarHeight),
             child: Container(
-            color: Colors.white,
-            child: const TabBar(
-            tabs: [
-            Tab(text: '개인'),
-            Tab(text: '개인 & 공동'),
-            Tab(text: '공동'),
-            ],
-          labelColor: Colors.black ,  //선택된 탭의 글 색상
-          unselectedLabelColor: Colors.grey,  //선택되지 않은 탭의 글 색상
-          indicatorColor: Colors.black, //선택된 탭 아래 막대 색상
-          indicatorWeight: 2.5, //선택된 탭 아래 막대의 높이
-            indicatorSize: TabBarIndicatorSize.label, //선택된 탭 아래 막대의 너비: 해당 탭의 글자의 너비에 맞게
+              color: Colors.white,
+              child: const TabBar(
+                tabs: [
+                  Tab(text: '개인'),
+                  Tab(text: '개인 & 공동'),
+                  Tab(text: '공동'),
+                ],
+                labelColor: Colors.black ,  //선택된 탭의 글 색상
+                unselectedLabelColor: Colors.grey,  //선택되지 않은 탭의 글 색상
+                indicatorColor: Colors.black, //선택된 탭 아래 막대 색상
+                indicatorWeight: 2.5, //선택된 탭 아래 막대의 높이
+                indicatorSize: TabBarIndicatorSize.label, //선택된 탭 아래 막대의 너비: 해당 탭의 글자의 너비에 맞게
+              ),
+            ),
           ),
         ),
-      ),
-    ),
 
-      body: SafeArea(
+        body: SafeArea(
           child: TabBarView(
             children: [
               Calendar(SingleGoals, SingleGoalsMap),      //개인 캘린더
@@ -119,7 +147,7 @@ class _FriendCalenderviewState extends State<FriendCalenderview>{
               Calendar(TogetherGoals, TogetherGoalsMap),  //공동 캘린더
             ],
           ),
-      ),
+        ),
 
       ),
     );
@@ -142,33 +170,9 @@ class _FriendCalenderviewState extends State<FriendCalenderview>{
               events: map,                          //각 탭에 해당되는 목표 데이터
             ),
 
-            //Prints 위젯 배치
-            Positioned.fill(
-              child: DraggableScrollableSheet(
-                initialChildSize: 0.1,  //화면의 초기 크기
-                minChildSize: 0.1,      //최소 크기
-                maxChildSize: 0.8,        //최대 크기
-                builder: (context,scrollController)=>Prints(
-                  selectedDate: selectedDate,           //선택된 날짜
-                  eventsMap: map,                 //날짜 별로 이벤트를 저장한 저장소
-                  scrollController: scrollController,
-                  checked:checked,  //체크 여부
-                  //체크 여부 동기화 함수
-                  onChecked:(plan,value){
-                    setState(() {
-                      checked[plan]=value;
-                    });
-                  },
-
-                  //[이벤트 삭제, 계획 추가/삭제/수정] 명령 함수 => 타 사용자 캘린더엔 불가)
-                  adddel: (Event event,{Plan? plan, bool removePlan=false ,bool removeEvent=false}) {
-                    Null;
-                  },
-                ),
-              ),
-            ),
           ],
         ),
       );
   }
+
 }
