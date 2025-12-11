@@ -3,24 +3,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 final supabase = Supabase.instance.client;
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Tree Growth App',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
-        useMaterial3: true,
-      ),
-      home: const Tree(),
-    );
-  }
-}
 
 class Tree extends StatefulWidget {
-  const Tree({super.key});
+  final String goalId;
+  const Tree({super.key, required this.goalId});
+
   @override
   TreeState createState() => TreeState();
 }
@@ -59,10 +46,13 @@ class TreeState extends State<Tree> {
 
     try {
       // 2-1. todos 테이블에서 현재 사용자의 모든 목표 데이터와 연관된 goal_id를 가져옴
+      final goalId = widget.goalId;
+
       final todosResponse = await supabase
           .from('todos')
-          .select('created_at, is_completed, goal_id')
+          .select('created_at, is_completed')
           .eq('user_id', currentUserId)
+          .eq('goal_id', goalId)
           .order('created_at', ascending: true);
 
       final List<Map<String, dynamic>> todosData = todosResponse.cast<
@@ -73,26 +63,15 @@ class TreeState extends State<Tree> {
         return;
       }
 
-      // 2-2. todos 데이터에서 대표 goal_id를 추출하고 상태 변수에 저장
-      final representativeGoalId = todosData.first['goal_id'] as String?;
-
-      if (mounted) {
-        setState(() {
-          currentGoalId = representativeGoalId; // 상태 변수에 저장
-        });
-      }
-
-      if (representativeGoalId == null) {
-        if (mounted) setState(() => isLoading = false);
-        return;
-      }
+      // 2-2. goal_id 추출
+      currentGoalId = widget.goalId;
 
 
       // 2-3. goals 테이블에서 기간 필드와 tree_stage를 가져옴
       final goalResponse = await supabase
           .from('goals')
           .select('created_at, completed_at, tree_stage')
-          .eq('id', representativeGoalId)
+          .eq('id', widget.goalId)
           .single();
 
       // 2-4. 기간(D) 계산 및 저장된 단계 로드
@@ -183,8 +162,7 @@ class TreeState extends State<Tree> {
     if (progress < 60) return 3;
     if (progress < 75) return 4;
     if (progress < 90) return 5;
-    if (progress < 100) return 6;
-    return 7; // 100% (최종 단계)
+    return 6; // 100% (최종 단계)
   }
 
   // 5. 빌드 위젯
@@ -193,6 +171,8 @@ class TreeState extends State<Tree> {
     if (isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
+    final width = MediaQuery.of(context).size.width;
+    final height = MediaQuery.of(context).size.height;
 
     return SafeArea(
         child: Container(
@@ -226,11 +206,13 @@ class TreeState extends State<Tree> {
                         ? Image.asset(
                       treeImages[stage - 1],
                       key: ValueKey(stage),
-                      width: 240,
+                      width: width * 0.8,
+                      height: height * 0.45,
+                      fit: BoxFit.contain,
                     )
                         : const SizedBox(
                       width: 200,
-                      height: 300,
+                      height: 350,
                     ),
                   ),
                 ),
@@ -238,7 +220,7 @@ class TreeState extends State<Tree> {
                 // 5. 달성률 반영 부분
                 Padding(
                   padding: const EdgeInsets.only(
-                      left: 50, right: 50, bottom: 10, top: 5),
+                      left: 50, right: 50, bottom: 5),
                   child: LinearProgressIndicator(
                     value: achievementRate,
                     backgroundColor: Colors.grey[200],
@@ -277,7 +259,7 @@ class TreeState extends State<Tree> {
                         await supabase
                             .from('goals')
                             .update({'tree_stage': newStage}) // goals 테이블 업데이트
-                            .eq('id', currentGoalId!); // 상태 변수를 사용하여 해당 목표만 업데이트
+                            .eq('id', widget.goalId);
 
                         setState(() {
                           stage = newStage; // DB 업데이트 성공 후 로컬 상태 업데이트

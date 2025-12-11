@@ -1,9 +1,14 @@
-import 'package:pbl_back/const/colors.dart';
+import 'package:pbl/const/colors.dart';
 import 'package:flutter/material.dart';
-import 'package:pbl_back/tap/calender/component/event.dart';
-import 'package:pbl_back/tap/calender/component/detailplan.dart';
-import 'package:pbl_back/tap/calender/board/board.dart';
-import 'dart:async';  ///Timer 라이브러리
+import 'package:pbl/tap/calender/component/event.dart';
+import 'package:pbl/tap/calender/component/detailplan.dart';
+import 'package:pbl/tap/calender/board/board.dart' hide supabase;
+import 'dart:async';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:pbl/tap/calender/tree/tree.dart' hide supabase;
+
+final supabase = Supabase.instance.client;
+
 /*<이벤트와 이벤트 속 계획 리스트를 출력>
 <이벤트 삭제와 계획 추가/삭제를 할 수 있는 로직>*/
 
@@ -105,6 +110,13 @@ class PrintsState extends State<Prints>{
 
             final event=events[index-1];  //스크롤 핸들 불포함=이벤트(계획)
 
+            // 오늘 날짜에 해당하는 계획만 골라내기
+            final todayPlans = event.plans.where((plan) {
+              return plan.selectdate.year == widget.selectedDate.year &&
+                  plan.selectdate.month == widget.selectedDate.month &&
+                  plan.selectdate.day == widget.selectedDate.day;
+            }).toList();
+
             //목표 공간을 한번 눌렀을 때, 계획 추가
             return GestureDetector(
               onTap: () async {
@@ -198,9 +210,9 @@ class PrintsState extends State<Prints>{
                         ),
                         //목표 삭제 후, 다이얼로그 닫기
                         ElevatedButton(
-                          onPressed: () {
+                          onPressed: () async {
                             widget.adddel(event, removeEvent: true);
-                            Navigator.of(context).pop();
+                            if (context.mounted) Navigator.of(context).pop();
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Color(0xFFFFDBDB),
@@ -246,172 +258,245 @@ class PrintsState extends State<Prints>{
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start,
 
-                              children: [
-                                SizedBox(width: 10),
+                            children: [
+                              SizedBox(width: 10),
 
-                                // 목표 제목
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    // 이모지
-                                    Text(
-                                      event.emoji ?? '⭐', // 이모지가 null일 경우 '⭐'로 대체
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                      ),
+                              // 목표 제목
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // 이모지
+                                  Text(
+                                    event.emoji ?? '⭐', // 이모지가 null일 경우 '⭐'로 대체
+                                    style: const TextStyle(
+                                      fontSize: 16,
                                     ),
+                                  ),
 
-                                    const SizedBox(width: 4), // 이모지와 제목 사이의 간격
+                                  const SizedBox(width: 4), // 이모지와 제목 사이의 간격
 
-                                    // 제목
-                                    Expanded(
-                                      child: Text(
-                                        insertSpacesForWrapping(event.title, 60),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                            fontFamily: 'Pretendard',
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w700,
-                                            color: Colors.black
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-
-                                // 공유 시 친구 목록
-                                if (event.togeter.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 2.0),
+                                  // 제목
+                                  Expanded(
                                     child: Text(
-                                      "with ${event.togeter.join(", ")}",
+                                      insertSpacesForWrapping(event.title, 60),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontFamily: 'Pretendard',
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w400,
-                                        color: DARK_GREY_COLOR,
+                                      style: const TextStyle(
+                                          fontFamily: 'Pretendard',
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.black
                                       ),
                                     ),
                                   ),
-                              ],
-                            ),
+                                ],
+                              ),
+
+                              // 공유 시 친구 목록
+                              if (event.togeter.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2.0),
+                                  child: FutureBuilder(
+                                    future: supabase
+                                        .from('users')
+                                        .select('nickname')
+                                        .filter('id', 'in', event.togeter), // ID 리스트로 닉네임들 조회
+                                    builder: (context, snapshot) {
+                                      // 데이터 로딩 중일 때
+                                      if (!snapshot.hasData) {
+                                        return Text(
+                                          "with ...",
+                                          style: TextStyle(
+                                            fontFamily: 'Pretendard',
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w400,
+                                            color: DARK_GREY_COLOR,
+                                          ),
+                                        );
+                                      }
+
+                                      // 데이터 가져오기 성공 시
+                                      final List<dynamic> data = snapshot.data as List<dynamic>;
+                                      final names = data.map((e) => e['nickname'] as String).toList();
+                                      final namesString = names.join(", ");
+
+                                      return Text(
+                                        "with $namesString",
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontFamily: 'Pretendard',
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w400,
+                                          color: DARK_GREY_COLOR,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                            ],
                           ),
+                        ),
 
-                          SizedBox(width: 20),
+                        SizedBox(width: 20),
 
-                          // 목표의 정보 출력
-                          InkWell(
-                            onTap: () {
-                              showDialog(
-                                context: context,
-                                builder: (BuildContext dialogContext) {
-                                  return AlertDialog(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10.0),
-                                    ),
-                                    contentPadding: const EdgeInsets.all(16.0),
-                                    backgroundColor: LIGHT_GREY_COLOR.withOpacity(0.8),
+                        IconButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context)=> Tree(goalId: event.id!)),
+                            );
+                          },
+                          icon: Icon(Icons.park_rounded),
+                          iconSize: 20,
+                        ),
 
-                                    // 다이얼로그의 내용
-                                    content: Column(
-                                      mainAxisSize: MainAxisSize.min, // 내용 크기에 맞게 다이얼로그 크기 최소화
-                                      crossAxisAlignment: CrossAxisAlignment.start, // 내용을 왼쪽 정렬
-                                      children: [
-                                        Text(
-                                          '공개 범위',
-                                          style: TextStyle(
-                                            fontFamily: 'Pretendard',
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w700,
-                                            color: PRIMARY_COLOR,
-                                          ),
+                        // 목표의 정보 출력
+                        InkWell(
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              builder: (BuildContext dialogContext) {
+                                return AlertDialog(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10.0),
+                                  ),
+                                  contentPadding: const EdgeInsets.all(16.0),
+                                  backgroundColor: LIGHT_GREY_COLOR.withOpacity(0.8),
+
+                                  // 다이얼로그의 내용
+                                  content: Column(
+                                    mainAxisSize: MainAxisSize.min, // 내용 크기에 맞게 다이얼로그 크기 최소화
+                                    crossAxisAlignment: CrossAxisAlignment.start, // 내용을 왼쪽 정렬
+                                    children: [
+                                      Text(
+                                        '공개 범위',
+                                        style: TextStyle(
+                                          fontFamily: 'Pretendard',
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                          color: PRIMARY_COLOR,
                                         ),
+                                      ),
 
-                                        const SizedBox(height: 4),
+                                      const SizedBox(height: 4),
 
-                                        Text( // 공개/비공개 여부
-                                          (event.secret == true) ? "비공개" : "공개",
-                                          style: const TextStyle(
+                                      Text( // 공개/비공개 여부
+                                        (event.secret == true) ? "비공개" : "공개",
+                                        style: const TextStyle(
+                                            fontFamily: 'Pretendard',
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w400,
+                                            color: Colors.black
+                                        ),
+                                      ),
+
+                                      const Divider(height: 20, thickness: 0.5),
+
+                                      Text(
+                                        '목표 기간',
+                                        style: TextStyle(
+                                          fontFamily: 'Pretendard',
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                          color: PRIMARY_COLOR,
+                                        ),
+                                      ),
+
+                                      const SizedBox(height: 4),
+
+                                      Text( // 목표의 기간
+                                        // 날짜 포맷을 YYYY-MM-DD 형식으로 통일
+                                        "${event.startDate.toString().split(' ')[0]} ~ ${event.endDate.toString().split(' ')[0]}",
+                                        style: const TextStyle(
+                                            fontFamily: 'Pretendard',
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w400,
+                                            color: Colors.black
+                                        ),
+                                      ),
+
+                                      const Divider(height: 20, thickness: 0.5), // 구분선
+
+                                      Text(
+                                        '공유 친구 (${event.togeter.length}명)',
+                                        style: TextStyle(
+                                          fontFamily: 'Pretendard',
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                          color: PRIMARY_COLOR,
+                                        ),
+                                      ),
+
+                                      const SizedBox(height: 4),
+
+                                      // 친구 목록 표시 (쉼표로 구분)
+                                        (event.togeter.isNotEmpty)
+                                            ? FutureBuilder(
+                                          // users 테이블에서 id가 event.togeter 리스트에 있는 사람들의 닉네임만 가져옴
+                                          future: Supabase.instance.client
+                                              .from('users')
+                                              .select('nickname')
+                                              .filter('id', 'in', event.togeter),
+                                          builder: (context, snapshot) {
+                                            // 1. 로딩 중일 때
+                                            if (!snapshot.hasData) {
+                                              return const Text(
+                                                "...",
+                                                style: TextStyle(
+                                                  fontFamily: 'Pretendard',
+                                                  fontSize: 13,
+                                                  color: Colors.grey,
+                                                ),
+                                              );
+                                            }
+
+                                            // 2. 데이터 도착! (List -> String 변환)
+                                            final List<dynamic> data = snapshot.data as List<dynamic>;
+                                            final names = data.map((e) => e['nickname'] as String).toList();
+                                            final namesString = names.join(', ');
+
+                                            // 3. 닉네임 출력
+                                            return Text(
+                                              namesString,
+                                              style: const TextStyle(
+                                                  fontFamily: 'Pretendard',
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w400,
+                                                  color: Colors.black
+                                              ),
+                                              softWrap: true,
+                                            );
+                                          },
+                                        )
+                                            : const Text(
+                                          '공유된 친구 없음',
+                                          style: TextStyle(
                                               fontFamily: 'Pretendard',
                                               fontSize: 13,
                                               fontWeight: FontWeight.w400,
                                               color: Colors.black
                                           ),
+                                          softWrap: true,
                                         ),
+                                      SizedBox(width: 8),
+                                    ],
+                                  ),
+                                );
+                              },
+                            );
+                          },
 
-                                        const Divider(height: 20, thickness: 0.5),
-
-                                        Text(
-                                          '목표 기간',
-                                          style: TextStyle(
-                                            fontFamily: 'Pretendard',
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w700,
-                                            color: PRIMARY_COLOR,
-                                          ),
-                                        ),
-
-                                        const SizedBox(height: 4),
-
-                                        Text( // 목표의 기간
-                                          // 날짜 포맷을 YYYY-MM-DD 형식으로 통일
-                                          "${event.startDate.toString().split(' ')[0]} ~ ${event.endDate.toString().split(' ')[0]}",
-                                          style: const TextStyle(
-                                              fontFamily: 'Pretendard',
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w400,
-                                              color: Colors.black
-                                          ),
-                                        ),
-
-                                        const Divider(height: 20, thickness: 0.5), // 구분선
-
-                                        Text(
-                                          '공유 친구 (${event.togeter.length}명)',
-                                          style: TextStyle(
-                                            fontFamily: 'Pretendard',
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w700,
-                                            color: PRIMARY_COLOR,
-                                          ),
-                                        ),
-
-                                        const SizedBox(height: 4),
-
-                                        // 친구 목록 표시 (쉼표로 구분)
-                                        Text(
-                                          (event.togeter.isNotEmpty)
-                                              ? event.togeter.join(', ')
-                                              : '공유된 친구 없음',
-                                          style: const TextStyle(
-                                              fontFamily: 'Pretendard',
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w400,
-                                              color: Colors.black
-                                          ),
-                                          softWrap: true, // 자동 줄바꿈
-                                        ),
-                                        SizedBox(width: 8),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              );
-                            },
-
-                            // 툴팁을 트리거하는 아이콘
-                            child: Icon(
-                              Icons.info_outline_rounded,
-                              size: 15,
-                              color: DARK_GREY_COLOR,
-                            ),
+                          // 툴팁을 트리거하는 아이콘
+                          child: Icon(
+                            Icons.info_outline_rounded,
+                            size: 15,
+                            color: DARK_GREY_COLOR,
                           ),
-                          SizedBox(width: 10),
-                        ],
-                      ),
+                        ),
+                        SizedBox(width: 10),
+                      ],
+                    ),
 
                     SizedBox(height: 8),  //위 가로로 배치한 컨테이너와 계획 부분의 간격
 
@@ -422,13 +507,12 @@ class PrintsState extends State<Prints>{
                         children: event.plans //지정된 event의 계획들.
                         //이것의 계획이 비어있지 않고, 선택한 날짜와 계획의 날짜가 같다면
                             .where((plan) =>
-                            plan.selectdate.year == widget.selectedDate.year &&
+                        plan.selectdate.year == widget.selectedDate.year &&
                             plan.selectdate.month == widget.selectedDate.month &&
                             plan.selectdate.day == widget.selectedDate.day)
                             .map((plan) {
 
-                          final timeStr =
-                              "${plan.selectdate.hour.toString().padLeft(2, '0')}:${plan.selectdate.minute.toString().padLeft(2, '0')}";
+                          final timeStr = "${plan.selectdate.hour.toString().padLeft(2, '0')}:${plan.selectdate.minute.toString().padLeft(2, '0')}";
 
 
                           ///현재 시각 확인=체크박스 나타나게
@@ -522,9 +606,9 @@ class PrintsState extends State<Prints>{
                                                 ),
                                                 //목표 삭제 후, 다이얼로그 닫기
                                                 ElevatedButton(
-                                                  onPressed: (){
+                                                  onPressed: () async{
                                                     widget.adddel(event, plan:plan, removePlan: true);
-                                                    Navigator.of(context).pop();
+                                                    if (context.mounted) Navigator.pop(context);
                                                   },
                                                   style: ElevatedButton.styleFrom(
                                                     backgroundColor: Color(0xFFFFDBDB),
@@ -576,7 +660,7 @@ class PrintsState extends State<Prints>{
                                   ),
 
                                   if(CheckboxCurrent)
-                                    //체크박스
+                                  //체크박스
                                     Transform.scale(    //크기 조정
                                       scale:1.6,
                                       child: Checkbox(
@@ -591,93 +675,17 @@ class PrintsState extends State<Prints>{
                                           Navigator.push(
                                             context,
                                             MaterialPageRoute(
-                                                builder: (context) =>
-                                                    CheckingPhoto(todo: todo, nickname: nickname!,)),
-                                          );
-                                        },
-                                          /*
-                                          if(tf==true){
-                                            showDialog(
-                                              context: context,
-                                              builder: (_)=>AlertDialog(
-                                                backgroundColor: Colors.white,
-                                                title: Text(
-                                                  '수행 확인',
-                                                  textAlign: TextAlign.center,
-                                                  style: TextStyle(
-                                                    fontFamily: "Pretendard",
-                                                    fontSize: 20,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: Colors.black87,
+                                              builder: (context) => CheckingPhoto(
+                                                todo: plan,
 
-                                                  ),
-                                                ),
-                                                content: Text(
-                                                  '${plan.text}를 완료하셨나요?',
-                                                  style: TextStyle(
-                                                    fontFamily: "Pretendard",
-                                                    fontSize: 15,
-                                                    fontWeight: FontWeight.w500,
-                                                    color: Colors.black87,
-                                                  ),
-                                                ),
-                                                actions: [
-                                                  //계획 체크 후, 다이얼로그 닫기
-                                                  TextButton(
-                                                    onPressed: (){
-                                                      setState(() {
-                                                        plan.isDone = true; // 로컬 상태 먼저 변경
-                                                        widget.onPlanUpdated(event); // DB 업데이트 요청
-                                                      });
-                                                    Navigator.of(context).pop();
-                                                  },
-                                                    style: TextButton.styleFrom(
-                                                      backgroundColor: PRIMARY_COLOR,
-                                                      foregroundColor: Colors.black87,
-                                                      elevation: 2,
-                                                    ),
-                                                    child: Text(
-                                                      '확인',
-                                                      style: TextStyle(
-                                                        fontFamily: 'Pretendard',
-                                                        fontWeight: FontWeight.w700,
-                                                        fontSize: 14,
-                                                        color: Colors.white,
-                                                      ),
-                                                    ),
-                                                  ),
-
-                                                  // 그냥 닫기
-                                                  TextButton(
-                                                    onPressed: (){
-                                                      Navigator.of(context).pop();
-                                                    },
-                                                    style: TextButton.styleFrom(
-                                                      backgroundColor: PRIMARY_COLOR,
-                                                      foregroundColor: Colors.black87,
-                                                      elevation: 2,
-                                                    ), child: Text(
-                                                      '취소',
-                                                      style: TextStyle(
-                                                        fontFamily: 'Pretendard',
-                                                        fontWeight: FontWeight.w700,
-                                                        fontSize: 14,
-                                                        color: Colors.white,
-                                                      ),
-                                                    ),
-                                                  ),
-
-                                                ],
+                                                isShared: event.togeter.isNotEmpty,
                                               ),
-                                            );
-                                          } else {
-                                            setState(() {
-                                              plan.isDone = false;
-                                              widget.onPlanUpdated(event); // DB 업데이트
-                                            });
-                                          }
+                                            ),
+                                          ).then((_) {
+                                            // 갔다 왔을 때 화면 갱신 (필요 시)
+                                            setState(() {});
+                                          });
                                         },
-                                      */
                                         //모서리 둥글게
                                         shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(5),
