@@ -162,7 +162,8 @@ class TreeState extends State<Tree> {
     if (progress < 60) return 3;
     if (progress < 75) return 4;
     if (progress < 90) return 5;
-    return 6; // 100% (최종 단계)
+    if (progress < 100) return 6;
+    return 7; // 100% (최종 단계)
   }
 
   // 5. 빌드 위젯
