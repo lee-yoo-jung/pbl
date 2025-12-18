@@ -38,38 +38,38 @@ class _MainScreenState extends State<MainScreen> {
     final List<Widget> items = [
       // 0: 랭킹
       Icon(
-        Icons.emoji_events_rounded,
-        size: (_selectedIndex == 0) ? 28 : 20,
-        color: Colors.white
+          Icons.emoji_events_rounded,
+          size: (_selectedIndex == 0) ? 28 : 20,
+          color: Colors.white
       ),
       // 1: 그룹
       Icon(
-        Icons.groups_rounded,
-        size: (_selectedIndex == 1) ? 28 : 20,
-        color: Colors.white
+          Icons.groups_rounded,
+          size: (_selectedIndex == 1) ? 28 : 20,
+          color: Colors.white
       ),
       // 2: 내 캘린더 (초기값)
       Icon(
-        Icons.calendar_month_rounded,
-        size: (_selectedIndex == 2) ? 28 : 20,
-        color: Colors.white
+          Icons.calendar_month_rounded,
+          size: (_selectedIndex == 2) ? 28 : 20,
+          color: Colors.white
       ),
       // 3: 친구
       Icon(
-        Icons.person_search_rounded,
-        size: (_selectedIndex == 3) ? 28 : 20,
-        color: Colors.white
+          Icons.person_search_rounded,
+          size: (_selectedIndex == 3) ? 28 : 20,
+          color: Colors.white
       ),
       // 4: 마이페이지
       Icon(
-        Icons.person_rounded,
-        size: (_selectedIndex == 4) ? 28 : 20,
-        color: Colors.white
+          Icons.person_rounded,
+          size: (_selectedIndex == 4) ? 28 : 20,
+          color: Colors.white
       ),
     ];
 
     return CurvedNavigationBar(
-      index: 2,
+      index: _selectedIndex,
       height: 65,
 
       backgroundColor: Colors.transparent,
@@ -89,7 +89,10 @@ class _MainScreenState extends State<MainScreen> {
     //build 메서드 안에서 위젯 리스트를 만들어야 최신 상태가 반영됨
     final List<Widget> widgetOptions = <Widget>[
       // 0번: 랭킹페이지(랭킹 공개 상태 전달)
-      RankingTap(isRankingPublic: _isRankingPublic),
+      RankingTap(
+        isRankingPublic: _isRankingPublic,
+        onTabSwitch: _onItemTapped,
+      ),
 
       const GroupGoalPage(), // 1번: 그룹 페이지
       const Calenderview(), // 2번: 내 캘린더 페이지(HomeScreen)
@@ -103,11 +106,14 @@ class _MainScreenState extends State<MainScreen> {
     ];
 
     return SafeArea(
-        child: Scaffold(
+        child:Scaffold(
           extendBody: true,
-          body: widgetOptions.elementAt(_selectedIndex),
+          body: IndexedStack(
+            index: _selectedIndex,
+            children: widgetOptions,
+          ),
           bottomNavigationBar: buildCurvedNavigationBar(),
-        ),
+        )
     );
   }
 }

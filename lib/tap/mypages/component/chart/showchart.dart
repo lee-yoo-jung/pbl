@@ -5,7 +5,7 @@ import 'package:pbl/tap/mypages/component/chart/broken_line_graph.dart';
 
 class chart extends StatelessWidget {
 
-  chart({Key? key}) : super(key: key);
+  const chart({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -35,14 +35,15 @@ class chart extends StatelessWidget {
             Spacer(),
           ],
         ),
-        toolbarHeight: 40.0, // 앱바의 높이 지정
+        toolbarHeight: 40.0,
       ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           children: [
             const SizedBox(height: sectionSpacing),
-            // GoalLineChart
+
+            // 꺾은선 그래프
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -59,16 +60,15 @@ class chart extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(innerPadding),
                 child: SizedBox(
-                  height: 300,
+                  height: 280,
                   child: GoalLineChart(),
                 ),
               ),
             ),
 
-            // 차트 간 간격
             const SizedBox(height: sectionSpacing),
 
-            // 두 번째 Container - synfusionbar
+            // 막대 그래프
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -85,13 +85,12 @@ class chart extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(innerPadding),
                 child: SizedBox(
-                  height: 300, // **synfusionbar 높이 230으로 재조정**
-                  child: synfusionbar(),
+                  height: 300, // 높이 조정됨
+                  child: SynfusionBar(),
                 ),
               ),
             ),
 
-            // ListView 맨 아래 여백 추가
             const SizedBox(height: sectionSpacing),
           ],
         ),

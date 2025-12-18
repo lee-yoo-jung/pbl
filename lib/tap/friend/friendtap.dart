@@ -1,106 +1,158 @@
-//friendtap.dart 친구 탭
-import 'package:pbl/const/colors.dart';
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pbl/tap/friend/friendsearch.dart';
+import 'package:pbl/services/friend_service.dart';
+import 'package:pbl/const/colors.dart';
 import 'package:pbl/tap/friend/FriendCalender/Friend_calenderview.dart';
 
-// 친구 데이터 모델 정의
 class Friend {
+  final String uid;
   final String nickname;
+  final String? avatarUrl;
   final List<String> goalTypes;
-  final int grade; // 1부터 5
-  bool isFriend; // 현재 친구인지 여부 (친구 목록이므로 모두 true여야 함)
-  final List<String> sharedGoals; // 공동 목표 목록
+  final int level;
+  final List<String> sharedGoals;
 
   Friend({
+    required this.uid,
     required this.nickname,
+    this.avatarUrl,
     required this.goalTypes,
-    required this.grade,
-    required this.isFriend,
+    required this.level,
     required this.sharedGoals,
   });
+
+  factory Friend.fromMap(Map<String, dynamic> map) {
+    return Friend(
+      uid: map['id'].toString(),
+      nickname: map['nickname'] ?? '알 수 없음',
+      avatarUrl: map['avatar_url'],
+      goalTypes: map['goal_types'] != null
+          ? List<String>.from(map['goal_types'])
+          : ['목표미설정'],
+      level: map['level'] != null ? int.parse(map['level'].toString()) : 1,
+      sharedGoals: map['shared_goals'] != null
+          ? List<String>.from(map['shared_goals'])
+          : [],
+    );
+  }
 }
 
-
-// 가상 친구 목록 데이터 (Mock Data)
-final List<Friend> mockFriendsList = [
-  Friend(
-    nickname: '친구1',
-    goalTypes: ['입시', '시험'],
-    grade: 4,
-    isFriend: true,
-    sharedGoals: ['체중 10kg 감량하기'],
-  ),
-  Friend(
-    nickname: '친구2',
-    goalTypes: ['운동', '식단', '취미'],
-    grade: 5,
-    isFriend: true,
-    sharedGoals: ['토익 900점 이상 받기', 'PBL A+ 받기', '여행'],
-  ),
-  Friend(
-    nickname: '친구3',
-    goalTypes: ['취업'],
-    grade: 2,
-    isFriend: true,
-    sharedGoals: [], // 공동 목표 없음
-  ),
-  Friend(
-    nickname: '친구4',
-    goalTypes: ['자기개발', '취미', '기타'],
-    grade: 1,
-    isFriend: true,
-    sharedGoals: ['대전여행', '중간고사'],
-  ),
-];
-
-
-// 친구 목록 페이지 위젯 (FriendsListPage)
-class FriendsListPage extends StatelessWidget {
+class FriendsListPage extends StatefulWidget {
   const FriendsListPage({super.key});
+
+  @override
+  State<FriendsListPage> createState() => _FriendsListPageState();
+}
+
+class _FriendsListPageState extends State<FriendsListPage> {
+  final FriendService _friendService = FriendService();
+  final _supabase = Supabase.instance.client;
+  List<Friend> _friendsList = [];
+  bool _isLoading = true;
+
+  StreamSubscription<List<Map<String, dynamic>>>? _friendsSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFriends();
+
+    _setupFriendsStream();
+  }
+
+  @override
+  void dispose() {
+    _friendsSubscription?.cancel();
+    super.dispose();
+  }
+
+  // 친구 목록 데이터 로드
+  Future<void> _loadFriends() async {
+    if (!mounted) return;
+    if (_friendsList.isEmpty) setState(() => _isLoading = true);
+
+    try {
+      final data = await _friendService.getFriendsList();
+      if (mounted) {
+        setState(() {
+          _friendsList = data.map((e) => Friend.fromMap(e)).toList();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("친구 목록 로드 중 에러: $e");
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _setupFriendsStream() {
+    final myId = _supabase.auth.currentUser?.id;
+    if (myId == null) return;
+
+    _friendsSubscription = _supabase
+        .from('friends')
+        .stream(primaryKey: ['id'])
+        .eq('status', 'accepted')
+        .listen((List<Map<String, dynamic>> data) {
+
+      _loadFriends();
+
+    }, onError: (e) {
+      debugPrint("친구 목록 실시간 에러: $e");
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[200],
       appBar: AppBar(
-        leading: const Icon(Icons.group, size: 30),
-        title: const Text('친구',
-          style: TextStyle(
+        leading: const Icon(
+          Icons.group,
+          size: 30,
           color: PRIMARY_COLOR,
-          fontSize: 20,
-          fontFamily: 'Pretendard',
-          fontWeight: FontWeight.w800,
-        ),),
-        toolbarHeight:40,
-        backgroundColor: Colors.white, // 이미지의 상단 바 색상
+        ),
+        title: const Text(
+          '친구',
+          style: TextStyle(
+            color: PRIMARY_COLOR,
+            fontSize: 20,
+            fontFamily: 'Pretendard',
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        toolbarHeight: 40,
+        backgroundColor: Colors.white,
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // '친구 목록' 제목과 '친구추가' 버튼이 배치된 영역
+          // '친구 목록' 제목과 '친구추가' 버튼 영역
           Container(
-            color: Colors.white, // 흰색 배경
+            color: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 25.0, vertical: 12.0),
             child: Row(
               children: [
-                // 왼쪽: '친구 목록' 제목
                 const Text(
                   '친구 목록',
                   style: TextStyle(
                       fontSize: 18,
-                      fontFamily: 'Pretendard-',
+                      fontFamily: 'Pretendard',
                       fontWeight: FontWeight.bold),
                 ),
-                const Spacer(), // 오른쪽 버튼을 끝까지 밀어냄
-                // 오른쪽:  '친구추가' 버튼
+                const Spacer(),
                 TextButton(
-                  onPressed: () {
+                  onPressed: () async {
                     debugPrint('친구추가 버튼 클릭됨');
-                    Navigator.push(
+                    // 친구 검색 화면으로 이동
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => const FriendSearchScreen()),
                     );
+                    // 돌아왔을 때 목록 새로고침
+                    _loadFriends();
                   },
                   style: ElevatedButton.styleFrom(
                     foregroundColor: Colors.black87,
@@ -115,23 +167,32 @@ class FriendsListPage extends StatelessWidget {
                       Text(
                         '친구추가',
                         style: TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.bold,
-                        color: Colors.black54),
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black54),
                       ),
                       Icon(Icons.keyboard_arrow_right)
                     ],
-                  )
+                  ),
                 ),
               ],
             ),
           ),
-          // 친구 목록
+
+          // 친구 목록 리스트
           Expanded(
-            child: ListView.builder(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _friendsList.isEmpty
+                ? const Center(child: Text("등록된 친구가 없습니다.", textAlign: TextAlign.center))
+                : ListView.builder(
               padding: const EdgeInsets.symmetric(vertical: 3.0),
-              itemCount: mockFriendsList.length,
+              itemCount: _friendsList.length,
               itemBuilder: (context, index) {
-                return _FriendListCard(friend: mockFriendsList[index]);
+                return _FriendListCard(
+                  friend: _friendsList[index],
+                  onDelete: _loadFriends,
+                );
               },
             ),
           ),
@@ -141,11 +202,14 @@ class FriendsListPage extends StatelessWidget {
   }
 }
 
-
-// 친구 목록 항목 카드 위젯
 class _FriendListCard extends StatelessWidget {
   final Friend friend;
-  const _FriendListCard({required this.friend});
+  final VoidCallback? onDelete;
+
+  const _FriendListCard({
+    required this.friend,
+    this.onDelete
+  });
 
   // 목표 유형 칩 스타일
   Widget _buildGoalTypeChip(String type) {
@@ -172,7 +236,6 @@ class _FriendListCard extends StatelessWidget {
     if (friend.sharedGoals.isEmpty) {
       return '함께 참여하는 일정 없음';
     } else {
-      // 최대 2개까지만 표시하고 나머지는 '외'로 처리
       final displayedGoals = friend.sharedGoals.take(2).join("', '");
       final remainingCount = friend.sharedGoals.length - 2;
 
@@ -186,16 +249,21 @@ class _FriendListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 삭제 기능을 위한 서비스
+    final FriendService friendService = FriendService();
+
     return Container(
       color: Colors.white,
-      margin: const EdgeInsets.symmetric(horizontal:3.0, vertical: 3.0),
-      child:  InkWell(
+      margin: const EdgeInsets.symmetric(horizontal: 3.0, vertical: 3.0),
+      child: InkWell(
         onTap: () {
-          debugPrint('${friend.nickname}의 캘린더로 이동 클릭됨');
+          // 친구 캘린더로 이동
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) =>
-                FriendCalenderview(friendname: friend.nickname,)
+            MaterialPageRoute(
+              builder: (context) => FriendCalenderview(
+                friend: friend,
+              ),
             ),
           );
         },
@@ -205,28 +273,36 @@ class _FriendListCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 프로필, 닉네임, 등급 섹션
+              // 프로필, 닉네임, 레벨, 삭제 버튼 섹션
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   CircleAvatar(
                     radius: 24,
-                    backgroundColor: Colors.grey,
-                    child: Icon(Icons.person, color: Colors.white, size: 24),
+                    backgroundColor: Colors.grey[300],
+                    // 이미지가 있으면 NetworkImage, 없으면 null
+                    backgroundImage: (friend.avatarUrl != null && friend.avatarUrl!.isNotEmpty)
+                        ? NetworkImage(friend.avatarUrl!)
+                        : null,
+                    // 이미지가 없을 때만 아이콘 표시
+                    child: (friend.avatarUrl == null || friend.avatarUrl!.isEmpty)
+                        ? const Icon(Icons.person, color: Colors.white, size: 24)
+                        : null,
                   ),
                   const SizedBox(width: 12),
-                  // 닉네임, 목표 유형 (수직 정렬)
+
+                  // 닉네임, 목표 유형
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 닉네임 (가장 위)
+                        // 닉네임
                         Text(
                           friend.nickname,
                           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 6),
-                        // 목표 유형 (닉네임 바로 아래에서 Wrap)
+                        // 목표 유형
                         Wrap(
                           spacing: 0,
                           runSpacing: 0,
@@ -239,7 +315,7 @@ class _FriendListCard extends StatelessWidget {
                     ),
                   ),
 
-                  // 등급 표시 (오른쪽 끝)
+                  // 레벨 표시
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
                     decoration: BoxDecoration(
@@ -247,7 +323,7 @@ class _FriendListCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(0),
                     ),
                     child: Text(
-                      '등급 ${friend.grade}',
+                      '등급 ${friend.level}',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
@@ -255,49 +331,92 @@ class _FriendListCard extends StatelessWidget {
                       ),
                     ),
                   ),
+
+                  // 삭제 버튼
                   Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 5, vertical: 5),
-                    child:IconButton(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+                    child: IconButton(
                       icon: Icon(
                         Icons.clear,
                         color: Colors.black.withOpacity(0.7),
                         size: 22,
                       ),
                       onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('${friend.nickname} 삭제'),
-                            duration: Duration(seconds: 1),
+                        // 삭제 확인 팝업
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text("친구 삭제",
+                              style: TextStyle(
+                              fontFamily: "Pretendard",
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black87,
+                            ),
+                            textAlign: TextAlign.center,),
+                            content: Text("${friend.nickname}님을 친구 목록에서 삭제하시겠습니까?",
+                              style: TextStyle(
+                              fontFamily: "Pretendard",
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.black87,
+                            ),),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text("취소", style: TextStyle(color: Colors.grey)),
+                              ),
+                              TextButton(
+                                onPressed: () async {
+                                  Navigator.pop(context); // 팝업 닫기
+                                  try {
+                                    // DB에서 삭제
+                                    await friendService.deleteFriend(friend.uid);
+
+                                    if (onDelete != null) onDelete!();
+
+                                    // 메시지 표시
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('${friend.nickname}님을 삭제했습니다.'),
+                                          duration: const Duration(seconds: 1),
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    debugPrint("친구 삭제 실패: $e");
+                                  }
+                                },
+                                child: const Text("삭제", style: TextStyle(color: Colors.red)),
+                              ),
+                            ],
                           ),
                         );
                       },
                     ),
                   ),
-
                 ],
               ),
 
               const SizedBox(height: 10),
 
               // 공동 목표 상태
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 5, vertical: 5),
-              child: Text(
-                _getSharedGoalsStatus(),
-                style: TextStyle(
-                  fontSize: 13,
-                  color: friend.sharedGoals.isEmpty ? Colors.grey[600] : Colors.black87,
-                  fontWeight: friend.sharedGoals.isEmpty ? FontWeight.normal : FontWeight.w500,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+                child: Text(
+                  _getSharedGoalsStatus(),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: friend.sharedGoals.isEmpty ? Colors.grey[600] : Colors.black87,
+                    fontWeight: friend.sharedGoals.isEmpty ? FontWeight.normal : FontWeight.w500,
+                  ),
                 ),
               ),
-            ),
             ],
           ),
         ),
-
-
       ),
-
     );
   }
 }

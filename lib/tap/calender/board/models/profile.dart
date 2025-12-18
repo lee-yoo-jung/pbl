@@ -1,18 +1,19 @@
 class Profile {
+  final String id;
+  final String nickname;
+  final String? avatarUrl;
+
   Profile({
     required this.id,
-    required this.username,
-    required this.createdAt,
+    required this.nickname,
+    this.avatarUrl,
   });
 
-  final String id;
-
-  final String username;
-
-  final DateTime createdAt;
-
-  Profile.fromMap(Map<String, dynamic> map)
-      : id = map['id'],
-        username = map['username'],
-        createdAt = DateTime.parse(map['created_at']);
+  factory Profile.fromMap(Map<String, dynamic> map) {
+    return Profile(
+      id: map['id'] ?? '',
+      nickname: map['nickname'] ?? '알 수 없음',
+      avatarUrl: map['avatar_url'],
+    );
+  }
 }

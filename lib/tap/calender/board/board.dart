@@ -1,64 +1,97 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import 'package:flutter/cupertino.dart';
 import 'package:pbl/tap/calender/board/ml.dart';
 import 'package:pbl/tap/calender/board/board_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:pbl/tap/calender/component/event.dart';
+import 'package:pbl/services/level_service.dart';
+
+final supabase = Supabase.instance.client;
 
 // 사진 인식 + 체크박스
-
 class CheckingPhoto extends StatefulWidget {
+  final Plan todo;
+  final bool isShared;
+
   const CheckingPhoto({
+    required this.todo,
+    required this.isShared,
     super.key,
   });
   @override
   State<CheckingPhoto> createState() => _CheckingPhoto();
 }
 
-
 class _CheckingPhoto extends State<CheckingPhoto> {
   String? selectedImageUrl;
   File? selectedImage;
   bool onlyCheckMode = false; // Only Check 모드 여부
-  String? analysisResult; //사진 분석 결과
+  String? analysisResult; // 사진 분석 결과
 
-  ///사진 파일 DB 버킷에 업로드
+  // 계획 완료 상태 DB 업데이트 로직 (개인/공유 구분 처리)
+  Future<void> _updatePlanStatus(String planId) async {
+    try {
+      // 개인 계획(todos) 테이블 업데이트 시도
+      final List<dynamic> response = await supabase
+          .from('todos')
+          .update({'is_completed': true})
+          .eq('id', planId)
+          .select();
+
+      // todos 테이블에서 업데이트된 게 없다면(빈 리스트), 공유 계획(todos_shares)
+      if (response.isEmpty) {
+        await supabase
+            .from('todos_shares')
+            .update({'is_completed': true})
+            .eq('id', planId);
+        debugPrint("공유 계획(todos_shares) 완료 처리됨");
+      } else {
+        debugPrint("개인 계획(todos) 완료 처리됨");
+      }
+    } catch (e) {
+      debugPrint("계획 업데이트 실패: $e");
+    }
+  }
+
+  // 사진 파일 DB 버킷에 업로드
   Future<String?> uploadImageToSupabase(String filePath) async {
     try {
-      final file = File(filePath);  //업로드할 파일을 읽도록
-      final fileName =  DateTime.now().millisecondsSinceEpoch.toString(); //업로드할 파일 이름을 생성
+      final file = File(filePath);
+      final user = supabase.auth.currentUser;
+      if (user == null) return null;
 
-      // Supabase Storage images 버킷에 업로드
-      final response = await supabase.storage.from('images').upload(fileName, file);
+      final fileExt = filePath.split('.').last;
+      final fileName = '${user.id}/${DateTime.now().millisecondsSinceEpoch}.$fileExt';
 
-      // Public URL: 업로드한 파일의 공개 URL 생성
-      final publicUrl = Supabase.instance.client.storage.from('images').getPublicUrl(fileName);
+      await supabase.storage.from('images').upload(
+        fileName,
+        file,
+        fileOptions: const FileOptions(upsert: true),
+      );
 
+      final publicUrl = supabase.storage.from('images').getPublicUrl(fileName);
       return publicUrl;
     } catch (e) {
-      print('Upload failed: $e');
+      debugPrint('이미지 업로드 실패: $e');
       return null;
     }
   }
 
-  // 모바일 환경에서 image_picker를 사용하여 실제 이미지를 선택하는 로직
+  // 이미지 선택 로직
   Future<void> pickImage(ImageSource imageSource) async {
-
-    final ImagePicker picker = ImagePicker();  //이미지 선택 도구
-    final pickedFile = await picker.pickImage(source: imageSource);  //선택된 이미지
+    final ImagePicker picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: imageSource);
 
     if (pickedFile == null) return;
 
-    //이미지 분석
+    // 이미지 분석
     String resultCategory = await ImageAnalyzer.analyzeCategory(pickedFile.path);
 
-    //업로드 시도
+    // 업로드 시도
     final uploadedUrl = await uploadImageToSupabase(pickedFile.path);
 
     if (uploadedUrl == null) {
-      // 업로드 실패 안내
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('이미지 업로드 실패, 다시 시도해주세요')),
       );
@@ -66,21 +99,20 @@ class _CheckingPhoto extends State<CheckingPhoto> {
     }
 
     setState(() {
-      selectedImageUrl = uploadedUrl;       // 업로드한 이미지 경로
-      selectedImage = File(pickedFile.path); // 이미지 저장
-      analysisResult = resultCategory;  //분석한 카테고리 저장
-      onlyCheckMode = false; //사진 업로드-> onlycheck는 거짓으로
+      selectedImageUrl = uploadedUrl;
+      selectedImage = File(pickedFile.path);
+      analysisResult = resultCategory;
+      onlyCheckMode = false;
     });
   }
 
   // Only Check 모드 설정
   void _toggleOnlyCheck() {
     setState(() {
-      // 이미지 해제, onlycheck를 참으로, 전에 분석한 결과를 null로
-      onlyCheckMode=true;
+      onlyCheckMode = true;
       selectedImageUrl = null;
-      selectedImage=null;
-      analysisResult=null;
+      selectedImage = null;
+      analysisResult = null;
     });
   }
 
@@ -101,19 +133,18 @@ class _CheckingPhoto extends State<CheckingPhoto> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 1. 고정된 게시글 텍스트 표시
-              Padding(
+            // 분석 결과 텍스트
+            Padding(
                 padding: const EdgeInsets.only(bottom: 25),
-                child: analysisResult == null?
-                      SizedBox(height: 10)
+                child: analysisResult == null
+                    ? const SizedBox(height: 10)
                     : Column(
-                        children: [
-                          Text("분석 결과: $analysisResult 사진" ),
-                        ],
-                      )
-              ),
+                  children: [
+                    Text("분석 결과: $analysisResult 사진"),
+                  ],
+                )),
 
-            // 2. 사진 첨부 영역
+            // 사진 첨부 영역
             Container(
               height: 200,
               decoration: BoxDecoration(
@@ -126,46 +157,49 @@ class _CheckingPhoto extends State<CheckingPhoto> {
               child: Center(
                 child: onlyCheckMode
                     ? const Center(
-                  child: Text('텍스트 전용 게시물',
+                  child: Text(
+                    '텍스트 전용 게시물',
                     style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
                   ),
                 )
                     : selectedImage != null
                     ? ClipRRect(
-                  borderRadius: BorderRadius.circular(15), // 모서리 둥글게
-                    child: Image.file(
-                      selectedImage!,
+                  borderRadius: BorderRadius.circular(15),
+                  child: Image.file(
+                    selectedImage!,
                     width: double.infinity,
                     height: double.infinity,
                     fit: BoxFit.scaleDown,
                   ),
-                ) : Center(
+                )
+                    : Center(
                   child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      isImageAttached ? Icons.check_circle_outline : Icons.add_a_photo,
-                      color: isImageAttached ? Colors.blue.shade400 : Colors.grey,
-                      size: 40,
-                    ),
-                    const SizedBox(height: 10),
-                    if(isImageAttached && selectedImage == null)Icon(Icons.photo, color: Colors.grey), // 이미지 없을 때 아이콘
-                    SizedBox(width: 8),
-                    Text(
-                      '사진 첨부',
-                      style: TextStyle(
-                        color: isImageAttached ? Colors.blue.shade600 : Colors.grey,
-                        fontWeight: FontWeight.bold,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        isImageAttached ? Icons.check_circle_outline : Icons.add_a_photo,
+                        color: isImageAttached ? Colors.blue.shade400 : Colors.grey,
+                        size: 40,
                       ),
-                    ),
-                  ],
-                ),
+                      const SizedBox(height: 10),
+                      if (isImageAttached && selectedImage == null)
+                        const Icon(Icons.photo, color: Colors.grey),
+                      const SizedBox(width: 8),
+                      Text(
+                        '사진 첨부',
+                        style: TextStyle(
+                          color: isImageAttached ? Colors.blue.shade600 : Colors.grey,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
             const SizedBox(height: 20.0),
 
-            // 3. Only Check 버튼
+            // Only Check 버튼
             ElevatedButton(
               onPressed: _toggleOnlyCheck,
               style: ElevatedButton.styleFrom(
@@ -176,158 +210,192 @@ class _CheckingPhoto extends State<CheckingPhoto> {
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
               child: Text(
-                'Only check ${onlyCheckMode ? '' : ''}',
+                'Only check',
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
             const SizedBox(height: 30.0),
 
-            // 4. 확인 및 취소 버튼
+            // 확인 및 취소 버튼
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
-                // 확인 버튼 (게시판으로 이동)
+                // 확인 버튼
                 Expanded(
                   child: ElevatedButton(
-                    onPressed:() async{
+                    onPressed: () async {
                       debugPrint("버튼 눌림");
 
-
-                      ///수파베이스 사용자 정보 및 저장 <테스트용>
-                      var user = supabase.auth.currentUser; //현재 앱에 로그인 된 사용자의 정보
-                      //없다면, 익명로그인
-                      if (user == null) {
-                        final res = await supabase.auth.signInAnonymously();
-                        user = res.user;
-                      }
-                      // 프로필 확인
-                      final profile = await supabase
-                          .from('profiles')
-                          .select()
-                          .eq('id', user!.id)
-                          .maybeSingle();
-                      //프로필이 없다면, 새 프로필 생성
-                      if (profile == null) {
-                        await supabase.from('profiles').insert({
-                          'id': user.id,
-                          'username': 'anon_${user.id.substring(0, 6)}',
-                        });
+                      String currentNickname = '알 수 없음';
+                      try {
+                        final user = supabase.auth.currentUser;
+                        if (user != null) {
+                          final data = await supabase
+                              .from('users')
+                              .select('nickname')
+                              .eq('id', user.id)
+                              .single();
+                          currentNickname = data['nickname'] ?? '알 수 없음';
+                        }
+                      } catch(e) {
+                        debugPrint("닉네임 로드 실패: $e");
                       }
 
-
-                      ///DB 저장
                       String content = '';
 
-                      ///체크 모드이면 바로 저장 (이미지 없이)  content: 사용자의 계획으로
+                      // Only Check 모드
                       if (onlyCheckMode) {
-                        //메시지 삽입
+                        content = '$currentNickname님이 ${widget.todo.text} 계획을 완료했습니다.';
+
+                        // 메시지 삽입
                         await supabase.from('messages').insert({
-                          'profile_id': user?.id,
-                          'content': 'Only Check',
+                          'user_id': supabase.auth.currentUser?.id,
+                          'content': content,
                           'image_url': null,
                         });
 
-                        debugPrint("사진 저장 안함");
+                        // 개인/공유 구분하여 업데이트
+                        await _updatePlanStatus(widget.todo.id!);
 
-                        // SnackBar로 띄우기
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              "체크되었습니다.",
+                        if (mounted) {
+                          await LevelService().grantExpForPlanCompletion(
+                            context,
+                            goalId: widget.todo.goalId ?? "",
+                            isPhotoVerified: false,
+                            isSharedGoal: widget.isShared,
+                          );
+                        }
+
+                        setState(() {
+                          widget.todo.isDone = true;
+                        });
+
+                        debugPrint("사진 저장 안함 (Only Check)");
+
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("체크되었습니다."),
+                              duration: Duration(seconds: 2),
+                              behavior: SnackBarBehavior.floating,
                             ),
-                            duration: Duration(seconds: 2),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-
-                        // 수파베이스 게시판으로 이동
-                        Navigator.pushReplacement(context,
-                          MaterialPageRoute(builder: (_) => BoardPage()),
-                        );
+                          );
+                          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => BoardPage()));
+                        }
                         return;
                       }
 
-                      ///사진 인증 실패  <'공부'에 사용자의 계획의 카테고리를 넣기>
-                      if (!onlyCheckMode && analysisResult?.trim()!= '공부') {
-
-                        await showDialog(
+                      // 사진 인증 실패 시 처리
+                      if (!onlyCheckMode && analysisResult?.trim() != widget.todo.hashtag) {
+                        if (mounted) {
+                          final navigatorContext = context;
+                          await showDialog(
                             context: context,
-                            builder:  (BuildContext context) {
+                            builder: (BuildContext dialogContext) {
                               return AlertDialog(
-                                content: Text('인증되지 않았습니다. \n 계속하실가요? \n "아니요" 클릭 시, Only Check로 진행됩니다.'),
+                                content: const Text('인증되지 않았습니다.\n계속하시겠습니까?\n"아니요" 클릭 시, Only Check로 진행됩니다.',
+                                  style: TextStyle(
+                                    fontFamily: "Pretendard",
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.black87,
+                                  )
+                                ),
                                 actions: [
                                   TextButton(
-                                    child: Text('아니요'),
+                                    child: const Text('아니요'),
                                     onPressed: () async {
-                                      // OnlyCheck로 전환 + 사진 제거
+                                      // 개인/공유 구분하여 업데이트
+                                      await _updatePlanStatus(widget.todo.id!);
+
+                                      if (navigatorContext.mounted) {
+                                        await LevelService().grantExpForPlanCompletion(
+                                          navigatorContext,
+                                          goalId: widget.todo.goalId ?? "",
+                                          isPhotoVerified: false,
+                                          isSharedGoal: false,
+                                        );
+                                      }
+
                                       setState(() {
-                                        onlyCheckMode = true;
-                                        selectedImageUrl = null;
-                                        selectedImage = null;
+                                        widget.todo.isDone = true;
                                       });
-                                      ///content: 사용자의 계획으로
+
+                                      // 실패 기록 메시지 저장
                                       await supabase.from('messages').insert({
-                                        'profile_id': user?.id,
-                                        'content': "계획=운동 (임시-인증실패)",
+                                        'user_id': supabase.auth.currentUser?.id,
+                                        'content': "$currentNickname님이 ${widget.todo.text} 계획을 완료했습니다.",
                                         'image_url': null,
                                       });
 
-                                      debugPrint('인증 실패하였습니다.');
+                                      debugPrint('인증 실패 -> Only Check 전환 저장');
 
-                                      Navigator.pop(context); // 다이얼로그 닫기
-                                      // 수파베이스 게시판으로 이동
-                                      Navigator.pushReplacement(context,
-                                        MaterialPageRoute(builder: (_) => BoardPage()),
-                                      );
+                                      if (mounted) {
+                                        Navigator.pop(dialogContext);
+                                        Navigator.of(navigatorContext).pushReplacement(
+                                          MaterialPageRoute(builder: (_) => BoardPage()),
+                                        );
+                                      }
                                     },
                                   ),
-
-                                  //페이지에 남도록 다이얼로그만 닫기
                                   TextButton(
-                                      child: Text('예'),
+                                      child: const Text('예'),
                                       onPressed: () {
-                                        Navigator.pop(context);
-                                      }
-                                  )
+                                        Navigator.pop(dialogContext);
+                                      })
                                 ],
                               );
                             },
-                        );
+                          );
+                        }
                         return;
                       }
+                      // 인증 성공
+                      else {
+                        content = "$currentNickname님이 ${widget.todo.text} 계획을 완료했습니다.";
 
-                      ///인식된 사진이 옳을 경우 = 정상 저장 <content: 사용자의 계획으로>
-                      else{
-                        // SnackBar로 띄우기
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              "인증되었습니다.",
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("인증되었습니다."),
+                              duration: Duration(seconds: 2),
+                              behavior: SnackBarBehavior.floating,
                             ),
-                            duration: Duration(seconds: 2),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-
-                        ///이미지를 성공적으로 인식할 때 <content: 사용자의 계획으로>
-                        content = "계획=공부 (임시메시지-인증완료)";
+                          );
+                        }
                       }
-                      //메시지 삽입
+
+                      // 최종 메시지 삽입
                       await supabase.from('messages').insert({
-                        'profile_id': user?.id,
+                        'user_id': supabase.auth.currentUser?.id,
                         'content': content,
                         'image_url': selectedImageUrl,
                       });
 
-                      debugPrint("DB에 사진 저장됨");
+                      // 인증 성공 시에도 계획 완료 처리 필요
+                      await _updatePlanStatus(widget.todo.id!);
+                      setState(() {
+                        widget.todo.isDone = true;
+                      });
 
-                      // 수파베이스 게시판으로 이동
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (_) => BoardPage()),
-                      );
+                      debugPrint("DB에 사진 및 인증 정보 저장됨");
+
+                      if (mounted) {
+                        await LevelService().grantExpForPlanCompletion(
+                          context,
+                          goalId: widget.todo.goalId ?? "",
+                          isPhotoVerified: true,
+                          isSharedGoal: widget.isShared,
+                        );
+                      }
+
+                      if (mounted) {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (_) => BoardPage()),
+                        );
+                      }
                     },
-
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue.shade400,
                       foregroundColor: Colors.white,
@@ -339,6 +407,7 @@ class _CheckingPhoto extends State<CheckingPhoto> {
                   ),
                 ),
                 const SizedBox(width: 10),
+
                 // 취소 버튼
                 Expanded(
                   child: ElevatedButton(
@@ -359,7 +428,7 @@ class _CheckingPhoto extends State<CheckingPhoto> {
             ),
             const SizedBox(height: 30.0),
 
-            // 5. 사진 촬영/선택 옵션
+            // 사진 촬영/선택 옵션
             const Divider(),
             _PhotoOptionTile(
               icon: Icons.camera_alt,
@@ -378,7 +447,6 @@ class _CheckingPhoto extends State<CheckingPhoto> {
   }
 }
 
-// 사진 옵션 타일 위젯 (PostCreationScreen에서 사용)
 class _PhotoOptionTile extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -403,5 +471,3 @@ class _PhotoOptionTile extends StatelessWidget {
     );
   }
 }
-
-

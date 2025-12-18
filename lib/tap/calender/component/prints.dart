@@ -2,11 +2,14 @@ import 'package:pbl/const/colors.dart';
 import 'package:flutter/material.dart';
 import 'package:pbl/tap/calender/component/event.dart';
 import 'package:pbl/tap/calender/component/detailplan.dart';
-import 'package:pbl/tap/calender/board/board.dart';
+import 'package:pbl/tap/calender/board/board.dart' hide supabase;
+import 'dart:async';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:pbl/tap/calender/tree/tree.dart' hide supabase;
 import 'package:pbl/tap/mypages/component/notification_service.dart';
 import 'package:timezone/timezone.dart' as tz;
-import 'package:pbl/tap/calender/tree/tree.dart';
-import 'dart:async';  ///Timer 라이브러리
+
+final supabase = Supabase.instance.client;
 
 /*<이벤트와 이벤트 속 계획 리스트를 출력>
 <이벤트 삭제와 계획 추가/삭제를 할 수 있는 로직>*/
@@ -16,16 +19,14 @@ class Prints extends StatefulWidget{
   final Map<DateTime, List<Event>> eventsMap; //기간 저장소
   final Function(Event,{Plan? plan,bool removePlan ,bool removeEvent}) adddel;  //이벤트 삭제, 계획 추가/삭제 명령 함수
   final ScrollController? scrollController;
-  final Map<Plan,bool> checked;
-  final void Function(Plan plan, bool value) onChecked;
+  final Function(Event event) onPlanUpdated;
 
   //매개변수
   const Prints({
     required this.selectedDate,
     required this.eventsMap,
     required this.adddel,
-    required this.checked,
-    required this.onChecked,
+    required this.onPlanUpdated,
     this.scrollController,
     Key? key,
   }) : super(key: key);
@@ -35,17 +36,34 @@ class Prints extends StatefulWidget{
 }
 
 class PrintsState extends State<Prints>{
-  Map<Plan,bool> checked={};  //체크박스
 
   //시간 제거해서 날짜 형식 통일
   DateTime getDateKey(DateTime date) => DateTime(date.year, date.month, date.day);
 
-  ///시간에 따라 체크박스 나타나게
+  String? nickname;
+
+  Future<void> fetchNickname() async {
+    final currentUserId = supabase.auth.currentUser?.id;
+
+    if (currentUserId == null) return;
+
+    final response = await supabase
+        .from('users')
+        .select('id, nickname, avatar_url')
+        .eq('id', currentUserId)
+        .maybeSingle();
+
+    setState(() {
+      nickname = response?['nickname'] ?? '익명';
+    });
+  }
+
+  //시간에 따라 체크박스 나타나게
   late Timer timer;
   @override
   void initState(){
     super.initState();
-
+    fetchNickname();
     //1초마다 확인 후, UI 갱신
     timer=Timer.periodic(const Duration(seconds: 1),(_){
       if(mounted) setState(() {});
@@ -72,171 +90,177 @@ class PrintsState extends State<Prints>{
 
       //스크롤 핸들, 이벤트(계획들) 리스트 뷰
       child:ListView.builder(
-        controller: widget.scrollController,
-        itemCount: events.length+1,     //스크롤 핸들 포함: +1
-        itemBuilder: (context,index){
-          if (index == 0) {
-            // 스크롤 핸들
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 15.0), // 상하 여백 추가
-              child: Center(
-                child: Container(
-                  width: 40,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(5),
+          controller: widget.scrollController,
+          itemCount: events.length+1,     //스크롤 핸들 포함: +1
+          itemBuilder: (context,index){
+            if (index == 0) {
+              // 스크롤 핸들
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 15.0), // 상하 여백 추가
+                child: Center(
+                  child: Container(
+                    width: 40,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
                   ),
                 ),
-              ),
-            );
-          }
-
-          final event=events[index-1];  //스크롤 핸들 불포함=이벤트(계획)
-
-          //목표 공간을 한번 눌렀을 때, 계획 추가
-          return GestureDetector(
-            onTap: () async {
-              //새 페이지에서 반환되는 값은 Plan객체로 updatedPlan에 저장됨
-              final updatedPlan = await showDialog<Plan>(
-                context: context,
-                //지정된 이벤트와 선택된 날짜를 Datailplan 페이지로 이동
-                barrierDismissible: true, //배경탭 시, 닫기
-                builder: (_)=> Detailplan(event: event, initialDate: widget.selectedDate),
               );
-              //반환된 updatedPlan이 null이 아니라면, 지정된 이벤트와 계획을 전달=추가
-              if (updatedPlan != null) {
-                widget.adddel(event,plan:updatedPlan);
+            }
 
-                /// 알람 예약
-                NotificationService().scheduleNotification(
-                  id: updatedPlan.hashCode,
-                  title: "일정 알림",
-                  body: "${updatedPlan.text} 일정이 있습니다.",
-                  scheduledDate: tz.TZDateTime.from(updatedPlan.selectdate, tz.local),
+            final event=events[index-1];
+
+            // 오늘 날짜에 해당하는 계획만 골라내기
+            final todayPlans = event.plans.where((plan) {
+              return plan.selectdate.year == widget.selectedDate.year &&
+                  plan.selectdate.month == widget.selectedDate.month &&
+                  plan.selectdate.day == widget.selectedDate.day;
+            }).toList();
+
+            //목표 공간을 한번 눌렀을 때, 계획 추가
+            return GestureDetector(
+              onTap: () async {
+                //새 페이지에서 반환되는 값은 Plan객체로 updatedPlan에 저장됨
+                final updatedPlan = await showDialog<Plan>(
+                  context: context,
+                  //지정된 이벤트와 선택된 날짜를 Datailplan 페이지로 이동
+                  barrierDismissible: true, //배경탭 시, 닫기
+                  builder: (_)=> Detailplan(event: event, initialDate: widget.selectedDate),
                 );
-              }
-            },
+                //반환된 updatedPlan이 null이 아니라면, 지정된 이벤트와 계획을 전달=추가
+                if (updatedPlan != null) {
+                  widget.adddel(event,plan:updatedPlan);
 
-            //목표 공간을 길게 눌렀을 때, 목표 삭제
-            onLongPress: (){
-              showDialog(
-                context: context,
-                builder: (BuildContext context){
-                  //목표 삭제 여부 확인
-                  return AlertDialog(
-                    backgroundColor: Colors.white,
-                    actionsAlignment: MainAxisAlignment.center,
-                    icon: Icon(
-                      Icons.warning_rounded,
-                      color: Colors.red[700],
-                      shadows: [
-                        Shadow(
-                          blurRadius: 4.0,
-                          color: Colors.grey.withOpacity(0.5),
-                          offset: Offset(1, 3),
-                        ),
-                      ],
-                    ),
-                    title: const Text(
-                      '목표 삭제',
-                      style: TextStyle(
-                        fontFamily: "Pretendard",
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black87,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    content: Text.rich(
-                      TextSpan(
-                        children: <TextSpan>[
-                          TextSpan(
-                            text: '목표를 영구히 삭제하시겠습니까?\n',
-                            style: TextStyle(
-                              fontFamily: "Pretendard",
-                              fontSize: 15,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          TextSpan(
-                            text: '삭제된 목표는 되돌리거나\n복구할 수 없습니다.',
-                            style: TextStyle(
-                              fontFamily: "Pretendard",
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                                color: Colors.red.shade600,
-                            ),
+                  /// 알람 예약
+                  NotificationService().scheduleNotification(
+                    id: updatedPlan.hashCode,
+                    title: "일정 알림",
+                    body: "${updatedPlan.text} 일정이 있습니다.",
+                    scheduledDate: tz.TZDateTime.from(updatedPlan.selectdate, tz.local),
+                  );
+                }
+              },
+
+              //목표 공간을 길게 눌렀을 때, 목표 삭제
+              onLongPress: (){
+                showDialog(
+                  context: context,
+                  builder: (BuildContext context){
+                    //목표 삭제 여부 확인
+                    return AlertDialog(
+                      backgroundColor: Colors.white,
+                      actionsAlignment: MainAxisAlignment.center,
+                      icon: Icon(
+                        Icons.warning_rounded,
+                        color: Colors.red[700],
+                        shadows: [
+                          Shadow(
+                            blurRadius: 4.0,
+                            color: Colors.grey.withOpacity(0.5),
+                            offset: Offset(1, 3),
                           ),
                         ],
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-
-                    actions: [
-                      //그냥 닫기
-                      ElevatedButton(
-                        onPressed: (){ Navigator.of(context).pop(); },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: PRIMARY_COLOR,
-                          foregroundColor: Colors.black87,
-                          elevation: 2,
+                      title: const Text(
+                        '목표 삭제',
+                        style: TextStyle(
+                          fontFamily: "Pretendard",
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black87,
                         ),
-                        child: const Text(
-                          '삭제 취소',
-                          style: TextStyle(
-                            fontFamily: 'Pretendard',
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            color: Colors.white,
+                        textAlign: TextAlign.center,
+                      ),
+                      content: Text.rich(
+                        TextSpan(
+                          children: <TextSpan>[
+                            TextSpan(
+                              text: '목표를 영구히 삭제하시겠습니까?\n',
+                              style: TextStyle(
+                                fontFamily: "Pretendard",
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            TextSpan(
+                              text: '삭제된 목표는 되돌리거나\n복구할 수 없습니다.',
+                              style: TextStyle(
+                                fontFamily: "Pretendard",
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.red.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+
+                      actions: [
+                        //그냥 닫기
+                        ElevatedButton(
+                          onPressed: (){ Navigator.of(context).pop(); },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: PRIMARY_COLOR,
+                            foregroundColor: Colors.black87,
+                            elevation: 2,
+                          ),
+                          child: const Text(
+                            '삭제 취소',
+                            style: TextStyle(
+                              fontFamily: 'Pretendard',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
-                      ),
-                      //목표 삭제 후, 다이얼로그 닫기
-                      ElevatedButton(
-                        onPressed: () {
-                          widget.adddel(event, removeEvent: true);
-                          Navigator.of(context).pop();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Color(0xFFFFDBDB),
-                          foregroundColor: Colors.white,
-                          elevation: 4,
-                        ),
-                        child: const Text(
-                          '목표 삭제', // 명확한 텍스트
-                          style: TextStyle(
-                            fontFamily: 'Pretendard',
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            color: Color(0xFFF30404),
+                        //목표 삭제 후, 다이얼로그 닫기
+                        ElevatedButton(
+                          onPressed: () async {
+                            widget.adddel(event, removeEvent: true);
+                            if (context.mounted) Navigator.of(context).pop();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFFFFDBDB),
+                            foregroundColor: Colors.white,
+                            elevation: 4,
+                          ),
+                          child: const Text(
+                            '목표 삭제', // 명확한 텍스트
+                            style: TextStyle(
+                              fontFamily: 'Pretendard',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: Color(0xFFF30404),
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  );
-                },
-              );
-            },
+                      ],
+                    );
+                  },
+                );
+              },
 
 
-            //목표(이벤트)출력
-            child: Container(
-              margin: EdgeInsets.symmetric(horizontal: 10.0, vertical: 17.0), //컨테이너의 테두리와 화면의 여백 설정
-              padding: EdgeInsets.all(5.0),                                   //컨테이너의 테두리와 내용의 여백 설정
-              decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10)
-              ),
+              //목표(이벤트)출력
+              child: Container(
+                margin: EdgeInsets.symmetric(horizontal: 10.0, vertical: 17.0), //컨테이너의 테두리와 화면의 여백 설정
+                padding: EdgeInsets.all(5.0),                                   //컨테이너의 테두리와 내용의 여백 설정
+                decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10)
+                ),
 
-              //[목표의 이름과 기간],[목표에 대한 계획]을 컨테이너 안에 세로로 배치
-              child: ListView(
-                shrinkWrap: true,     //자식의 크기에 맞춰 크기를 정함
-                physics: NeverScrollableScrollPhysics(), // List view 스크롤 가능 위젯 안에서 스크롤 중복 방지
-                children: [
-                  Expanded(
-                    child: Row(
+                //[목표의 이름과 기간],[목표에 대한 계획]을 컨테이너 안에 세로로 배치
+                child: ListView(
+                  shrinkWrap: true,     //자식의 크기에 맞춰 크기를 정함
+                  physics: NeverScrollableScrollPhysics(), // List view 스크롤 가능 위젯 안에서 스크롤 중복 방지
+                  children: [
+                    Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Expanded(
@@ -282,16 +306,42 @@ class PrintsState extends State<Prints>{
                               if (event.togeter.isNotEmpty)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 2.0),
-                                  child: Text(
-                                    "with ${event.togeter.join(", ")}",
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                        fontFamily: 'Pretendard',
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w400,
-                                        color: DARK_GREY_COLOR,
-                                    ),
+                                  child: FutureBuilder(
+                                    future: supabase
+                                        .from('users')
+                                        .select('nickname')
+                                        .filter('id', 'in', event.togeter), // ID 리스트로 닉네임들 조회
+                                    builder: (context, snapshot) {
+                                      // 데이터 로딩 중일 때
+                                      if (!snapshot.hasData) {
+                                        return Text(
+                                          "with ...",
+                                          style: TextStyle(
+                                            fontFamily: 'Pretendard',
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w400,
+                                            color: DARK_GREY_COLOR,
+                                          ),
+                                        );
+                                      }
+
+                                      // 데이터 가져오기 성공 시
+                                      final List<dynamic> data = snapshot.data as List<dynamic>;
+                                      final names = data.map((e) => e['nickname'] as String).toList();
+                                      final namesString = names.join(", ");
+
+                                      return Text(
+                                        "with $namesString",
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontFamily: 'Pretendard',
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w400,
+                                          color: DARK_GREY_COLOR,
+                                        ),
+                                      );
+                                    },
                                   ),
                                 ),
                             ],
@@ -304,7 +354,7 @@ class PrintsState extends State<Prints>{
                           onPressed: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (context)=> Tree()),
+                              MaterialPageRoute(builder: (context)=> Tree(goalId: event.id!)),
                             );
                           },
                           icon: Icon(Icons.park_rounded),
@@ -391,17 +441,51 @@ class PrintsState extends State<Prints>{
                                       const SizedBox(height: 4),
 
                                       // 친구 목록 표시 (쉼표로 구분)
-                                      Text(
-                                        (event.togeter.isNotEmpty)
-                                            ? event.togeter.join(', ')
-                                            : '공유된 친구 없음',
-                                        style: const TextStyle(
+                                      (event.togeter.isNotEmpty)
+                                          ? FutureBuilder(
+                                        // users 테이블에서 id가 event.togeter 리스트에 있는 사람들의 닉네임만 가져옴
+                                        future: Supabase.instance.client
+                                            .from('users')
+                                            .select('nickname')
+                                            .filter('id', 'in', event.togeter),
+                                        builder: (context, snapshot) {
+                                          if (!snapshot.hasData) {
+                                            return const Text(
+                                              "...",
+                                              style: TextStyle(
+                                                fontFamily: 'Pretendard',
+                                                fontSize: 13,
+                                                color: Colors.grey,
+                                              ),
+                                            );
+                                          }
+
+                                          final List<dynamic> data = snapshot.data as List<dynamic>;
+                                          final names = data.map((e) => e['nickname'] as String).toList();
+                                          final namesString = names.join(', ');
+
+                                          // 닉네임 출력
+                                          return Text(
+                                            namesString,
+                                            style: const TextStyle(
+                                                fontFamily: 'Pretendard',
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w400,
+                                                color: Colors.black
+                                            ),
+                                            softWrap: true,
+                                          );
+                                        },
+                                      )
+                                          : const Text(
+                                        '공유된 친구 없음',
+                                        style: TextStyle(
                                             fontFamily: 'Pretendard',
                                             fontSize: 13,
                                             fontWeight: FontWeight.w400,
                                             color: Colors.black
                                         ),
-                                        softWrap: true, // 자동 줄바꿈
+                                        softWrap: true,
                                       ),
                                       SizedBox(width: 8),
                                     ],
@@ -421,221 +505,229 @@ class PrintsState extends State<Prints>{
                         SizedBox(width: 10),
                       ],
                     ),
-                  ),
 
-                  SizedBox(height: 8),  //위 가로로 배치한 컨테이너와 계획 부분의 간격
+                    SizedBox(height: 8),  //위 가로로 배치한 컨테이너와 계획 부분의 간격
 
-                  // 지정된 event 안의 plan이 비어있지 않은 경우
-                  if (event.plans.isNotEmpty)
-                  //목표의 계획을 세로로 배치
-                    Column(
-                      children: event.plans //지정된 event의 계획들.
-                      //이것의 계획이 비어있지 않고, 선택한 날짜와 계획의 날짜가 같다면
-                          .where((plan) =>
-                      widget.selectedDate != null && plan.selectdate.year == widget.selectedDate!.year &&plan.selectdate.month == widget.selectedDate!.month &&plan.selectdate.day == widget.selectedDate!.day)
-                      //계획의 날짜와 시간을 "YYYY-MM-DD"(dateStr)와 "HH:MM"(timeStr)로 바꾸기
-                          .map((plan) {
-                        checked.putIfAbsent(plan, ()=>false); //초기값은 false
-                        //final dateStr =
-                        //"${${plan.selectdate.year}-plan.selectdate.month.toString().padLeft(2, '0')}-${plan.selectdate.day.toString().padLeft(2, '0')}";
-                        final timeStr =
-                            "${plan.selectdate.hour.toString().padLeft(2, '0')}:${plan.selectdate.minute.toString().padLeft(2, '0')}";
+                    // 지정된 event 안의 plan이 비어있지 않은 경우
+                    if (event.plans.isNotEmpty)
+                    //목표의 계획을 세로로 배치
+                      Column(
+                        children: event.plans //지정된 event의 계획들.
+                        //이것의 계획이 비어있지 않고, 선택한 날짜와 계획의 날짜가 같다면
+                            .where((plan) =>
+                        plan.selectdate.year == widget.selectedDate.year &&
+                            plan.selectdate.month == widget.selectedDate.month &&
+                            plan.selectdate.day == widget.selectedDate.day)
+                            .map((plan) {
 
-                        ///현재 시각 확인=체크박스 나타나게
-                        bool CheckboxCurrent=DateTime.now().isAfter(plan.selectdate);
+                          final timeStr = "${plan.selectdate.hour.toString().padLeft(2, '0')}:${plan.selectdate.minute.toString().padLeft(2, '0')}";
 
-                        //계획의 날짜와 시간, 체크박스를 가로로 배치
-                        return AbsorbPointer(
-                          absorbing: widget.checked[plan]??false,
-                          child: Container(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,  //균등하게 배치
-                              children: [
-                                SizedBox(width: 8),
-                                Expanded(
-                                  child: GestureDetector(
-                                    //계획 공간을 길게 눌렀을 때, 계획 삭제
-                                    onLongPress:(){
-                                      showDialog(
-                                        context: context,
-                                        builder: (BuildContext context){
-                                          //계획 삭제 여부
 
-                                          return AlertDialog(
-                                            backgroundColor: Colors.white,
-                                            actionsAlignment: MainAxisAlignment.center,
-                                            icon: Icon(
-                                              Icons.delete_forever_outlined,
-                                              color: DARK_BLUE,
-                                              shadows: [
-                                                Shadow(
-                                                  blurRadius: 4.0,
-                                                  color: Colors.grey.withOpacity(0.5),
-                                                  offset: Offset(1, 3),
-                                                ),
-                                              ],
-                                            ),
-                                            title: const Text(
-                                              '계획 삭제',
-                                              style: TextStyle(
-                                                fontFamily: "Pretendard",
-                                                fontSize: 20,
-                                                fontWeight: FontWeight.w700,
-                                                color: Colors.black87,
-                                              ),
-                                              textAlign: TextAlign.center,
-                                            ),
-                                            content: Text.rich(
-                                              TextSpan(
-                                                children: <TextSpan>[
-                                                  TextSpan(
-                                                    text: '계획을 영구히 삭제하시겠습니까?\n',
-                                                    style: TextStyle(
-                                                      fontFamily: "Pretendard",
-                                                      fontSize: 15,
-                                                      fontWeight: FontWeight.w500,
-                                                      color: Colors.black87,
-                                                    ),
-                                                  ),
-                                                  TextSpan(
-                                                    text: '삭제된 계획은 되돌리거나\n복구할 수 없습니다.',
-                                                    style: TextStyle(
-                                                      fontFamily: "Pretendard",
-                                                      fontSize: 15,
-                                                      fontWeight: FontWeight.w600,
-                                                      color: Colors.red.shade600,
-                                                    ),
+                          ///현재 시각 확인=체크박스 나타나게
+                          bool CheckboxCurrent=DateTime.now().isAfter(plan.selectdate);
+
+                          //계획의 날짜와 시간, 체크박스를 가로로 배치
+                          return AbsorbPointer(
+                            absorbing: plan.isDone,
+                            child: Container(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,  //균등하게 배치
+                                children: [
+                                  SizedBox(width: 8),
+                                  Expanded(
+                                    child: GestureDetector(
+                                      //계획 공간을 길게 눌렀을 때, 계획 삭제
+                                      onLongPress:(){
+                                        showDialog(
+                                          context: context,
+                                          builder: (BuildContext context){
+                                            //계획 삭제 여부
+
+                                            return AlertDialog(
+                                              backgroundColor: Colors.white,
+                                              actionsAlignment: MainAxisAlignment.center,
+                                              icon: Icon(
+                                                Icons.delete_forever_outlined,
+                                                color: DARK_BLUE,
+                                                shadows: [
+                                                  Shadow(
+                                                    blurRadius: 4.0,
+                                                    color: Colors.grey.withOpacity(0.5),
+                                                    offset: Offset(1, 3),
                                                   ),
                                                 ],
                                               ),
-                                              textAlign: TextAlign.center,
-                                            ),
-
-                                            actions: [
-                                              //그냥 닫기
-                                              ElevatedButton(
-                                                onPressed: (){ Navigator.of(context).pop(); },
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: PRIMARY_COLOR,
-                                                  foregroundColor: Colors.black87,
-                                                  elevation: 2,
+                                              title: const Text(
+                                                '계획 삭제',
+                                                style: TextStyle(
+                                                  fontFamily: "Pretendard",
+                                                  fontSize: 20,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Colors.black87,
                                                 ),
-                                                child: const Text(
-                                                  '삭제 취소',
-                                                  style: TextStyle(
-                                                    fontFamily: 'Pretendard',
-                                                    fontWeight: FontWeight.w700,
-                                                    fontSize: 14,
-                                                    color: Colors.white,
+                                                textAlign: TextAlign.center,
+                                              ),
+                                              content: Text.rich(
+                                                TextSpan(
+                                                  children: <TextSpan>[
+                                                    TextSpan(
+                                                      text: '계획을 영구히 삭제하시겠습니까?\n',
+                                                      style: TextStyle(
+                                                        fontFamily: "Pretendard",
+                                                        fontSize: 15,
+                                                        fontWeight: FontWeight.w500,
+                                                        color: Colors.black87,
+                                                      ),
+                                                    ),
+                                                    TextSpan(
+                                                      text: '삭제된 계획은 되돌리거나\n복구할 수 없습니다.',
+                                                      style: TextStyle(
+                                                        fontFamily: "Pretendard",
+                                                        fontSize: 15,
+                                                        fontWeight: FontWeight.w600,
+                                                        color: Colors.red.shade600,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                textAlign: TextAlign.center,
+                                              ),
+
+                                              actions: [
+                                                //그냥 닫기
+                                                ElevatedButton(
+                                                  onPressed: (){ Navigator.of(context).pop(); },
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: PRIMARY_COLOR,
+                                                    foregroundColor: Colors.black87,
+                                                    elevation: 2,
+                                                  ),
+                                                  child: const Text(
+                                                    '삭제 취소',
+                                                    style: TextStyle(
+                                                      fontFamily: 'Pretendard',
+                                                      fontWeight: FontWeight.w700,
+                                                      fontSize: 14,
+                                                      color: Colors.white,
+                                                    ),
                                                   ),
                                                 ),
-                                              ),
-                                              //계획 삭제 후, 다이얼로그 닫기
-                                              ElevatedButton(
-                                                onPressed: (){
-                                                  widget.adddel(event, plan:plan, removePlan: true);
-
-                                                  ///알람 삭제
-                                                  NotificationService().flutterLocalNotificationsPlugin.cancel(plan.hashCode);
-
-                                                  Navigator.of(context).pop();
-                                                },
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: Color(0xFFFFDBDB),
-                                                  foregroundColor: Colors.white,
-                                                  elevation: 4,
-                                                ),
-                                                child: Text(
-                                                  '계획 삭제',
-                                                  style: TextStyle(
-                                                    fontFamily: 'Pretendard',
-                                                    fontWeight: FontWeight.w700,
-                                                    fontSize: 14,
-                                                    color: Color(0xFFF30404),
+                                                //목표 삭제 후, 다이얼로그 닫기
+                                                ElevatedButton(
+                                                  onPressed: () async{
+                                                    widget.adddel(event, plan:plan, removePlan: true);
+                                                    ///알람 삭제
+                                                    NotificationService().flutterLocalNotificationsPlugin.cancel(plan.hashCode);
+                                                    if (context.mounted) Navigator.pop(context);},
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: Color(0xFFFFDBDB),
+                                                    foregroundColor: Colors.white,
+                                                    elevation: 4,
+                                                  ),
+                                                  child: Text(
+                                                    '계획 삭제',
+                                                    style: TextStyle(
+                                                      fontFamily: 'Pretendard',
+                                                      fontWeight: FontWeight.w700,
+                                                      fontSize: 14,
+                                                      color: Color(0xFFF30404),
+                                                    ),
                                                   ),
                                                 ),
-                                              ),
-                                            ],
-                                          );
-                                        },
-                                      );
-                                    },
-                                    //계획 컨테이너
-                                    child: Container(
-                                      height: 31,
-                                      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5), // 안쪽 여백
-                                      decoration: BoxDecoration(
-                                        //체크박스에 체크가 되면 회색, 체크가 안되면 흰색
-                                        color: widget.checked[plan]??false ? DARK_BLUE: Colors.white ,          // 배경색
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: DARK_BLUE.withOpacity(0.3),
-                                          width: 1,
-                                        ),
-                                      ),
-
-                                      child: Text(
-                                        "$timeStr | ${plan.type + " | " ?? ''} ${plan.text}",
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontFamily: 'Pretendard',
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w400,
-                                          color: Colors.black
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-
-                                ///설정한 시간 이후에 체크박스 나타남
-                                if(CheckboxCurrent)
-                                  //체크박스
-                                  Transform.scale(    //크기 조정
-                                    scale:1.6,
-                                    child: Checkbox(
-                                      value: widget.checked[plan]??false,
-
-                                      onChanged: (tf) {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(builder: (context)=> CheckingPhoto()),
+                                              ],
+                                            );
+                                          },
                                         );
                                       },
-                                      //모서리 둥글게
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(5),
-                                      ),
-                                      //테두리 색/두께
-                                      side: BorderSide(
-                                        color: DARK_BLUE.withOpacity(0.3),
-                                        width: 0.7,
-                                      ),
+                                      //계획 컨테이너
+                                      child: Container(
+                                        height: 31,
+                                        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5), // 안쪽 여백
+                                        decoration: BoxDecoration(
+                                          //체크박스에 체크가 되면 회색, 체크가 안되면 흰색
+                                          color: plan.isDone ? DARK_BLUE : Colors.white,          // 배경색
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: DARK_BLUE.withOpacity(0.3),
+                                            width: 1,
+                                          ),
+                                        ),
 
-                                      fillColor: MaterialStateProperty.resolveWith<Color>(
-                                        (Set<MaterialState> states){
-                                          if(states.contains(MaterialState.selected)){
-                                            return PRIMARY_COLOR; //체크될 때,색
-                                          }
-                                          return Colors.white;   //체크 표시 색
-                                        }
+                                        child: Text(
+                                          "$timeStr | ${plan.hashtag != null ? "${plan.hashtag} | " : ""}${plan.text}",
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                              fontFamily: 'Pretendard',
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w400,
+                                              color: Colors.black
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
-                                SizedBox(width: 5),
-                              ],
+
+                                  if(CheckboxCurrent)
+                                  //체크박스
+                                    Transform.scale(    //크기 조정
+                                      scale:1.6,
+                                      child: Checkbox(
+                                        value: plan.isDone,
+
+                                        ///인증사진 or 체크 페이지로 이동
+                                        ///<board.dart에서 [확인] 누를시, DB에 체킹되게>
+                                        onChanged: (tf) async{
+                                          final todo = plan;
+
+                                          if (nickname == null) await fetchNickname();
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) => CheckingPhoto(
+                                                todo: plan,
+
+                                                isShared: event.togeter.isNotEmpty,
+                                              ),
+                                            ),
+                                          ).then((_) {
+                                            // 갔다 왔을 때 화면 갱신 (필요 시)
+                                            setState(() {});
+                                          });
+                                        },
+                                        //모서리 둥글게
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(5),
+                                        ),
+                                        //테두리 색/두께
+                                        side: BorderSide(
+                                          color: DARK_BLUE.withOpacity(0.3),
+                                          width: 0.7,
+                                        ),
+
+                                        fillColor: MaterialStateProperty.resolveWith<Color>(
+                                                (Set<MaterialState> states){
+                                              if(states.contains(MaterialState.selected)){
+                                                return PRIMARY_COLOR; //체크될 때,색
+                                              }
+                                              return Colors.white;   //체크 표시 색
+                                            }
+                                        ),
+                                      ),
+                                    ),
+                                  SizedBox(width: 5),
+                                ],
+                              ),
                             ),
-                          ),
-                        );
-                      }
-                    ).toList(),
-                  ),
-                ],
+                          );
+                        }
+                        ).toList(),
+                      ),
+                  ],
+                ),
               ),
-            ),
-          );
-        }
+            );
+          }
       ),
     );
   }

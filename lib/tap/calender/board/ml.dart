@@ -7,18 +7,18 @@ class ImageAnalyzer{
     '공부': [
       'Chair', 'Desk', 'Blackboard', 'Whiteboard', 'Computer', 'Poster',
       'Presentation', 'School', 'Class', 'Paper', 'Newspaper',
-      'Mortarboard',"Sitting",
+      'Graduation', 'Mortarboard',"Sitting",
     ],
     '운동': [
       'Badminton', 'Bicycle', 'Stadium', 'Surfboard', 'Wetsuit',
       'Windsurfing', 'Sports', 'Cycling', 'Kayak', 'Skateboarder',
       'Skateboard', 'Surfing', 'Rugby', 'Running', 'Gymnastics', 'Rowing',
       'Track', 'Roller', 'Sledding', 'Snowboarding', 'Waterskiing',
-      'Skiing', 'Swimming', 'Pool', 'Tubing', 'Muscle', 'Canoe',
-      'Archery', 'Pitch', 'Soccer', 'Marathon', 'Backpacking', 'Rafting',
+      'Skiing', 'Swimming', 'Pool', 'Tubing', 'Muscle', 'Canoe',"Standing",
+      'Archery', 'Pitch', 'Soccer', 'Marathon', 'Backpacking', 'Rafting',"Sitting"
     ],
     '식단': [
-      "Food","Vegetable", "Fruit", "Meal",
+      "Food","Vegetable", "Fruit", "Meal", "Supper",
       "Lunch", "Cookware and bakeware","Kitchen",
     ],
     '예술': [
@@ -27,23 +27,26 @@ class ImageAnalyzer{
     ],
     '기타': [
       "Team", "Sunset", "Interaction",
-      "Laugh", "Picnic", "Community", "Curtain",
+      "Laugh", "Picnic", "Community", "Pillow", "Curtain",
       "Tableware", "Plant", "Flower", "Flowerpot",
       "Camping", "Playground", "Garden", "Forest",
-      "Lake", "River", "Mountain", "Waterfall", "Wall", "Floor", "Window",
+      "Lake", "River", "Mountain", "Waterfall",
+      "Roof", "Wall", "Floor", "Window",
       "Hand",
       "Event",
-        "News"
-        "Newspaper",
-        "Bus",
-        "Car",
-        "Road",
-        "Building",
-        "Museum",
-        "Castle",
-        "Temple",
-        "Church",
-        "Farm",
+      "Presentation",
+      "News"
+          "Newspaper",
+      "Bus",
+      "Car",
+      "Bicycle",
+      "Road",
+      "Building",
+      "Museum",
+      "Castle",
+      "Temple",
+      "Church",
+      "Farm",
     ]
   };
 

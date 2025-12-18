@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:pbl/const/colors.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+// 목표 유형 상수 리스트
 const List<String> goalTypes = [
   '입시',
   '취업',
@@ -12,7 +13,6 @@ const List<String> goalTypes = [
   '기타',
 ];
 
-// 목표 유형 선택 화면을 나타내는 StatefulWidget
 class GoalTypeSelectorPage extends StatefulWidget {
   const GoalTypeSelectorPage({super.key});
 
@@ -20,25 +20,93 @@ class GoalTypeSelectorPage extends StatefulWidget {
   State<GoalTypeSelectorPage> createState() => _GoalTypeSelectorPageState();
 }
 
-// 화면의 동적 상태(선택된 항목 목록)를 관리하는 State 클래스
 class _GoalTypeSelectorPageState extends State<GoalTypeSelectorPage> {
+  final supabase = Supabase.instance.client;
+
   // 선택된 목표 유형을 저장하는 리스트
   final List<String> _selectedGoals = [];
   // 최대 선택 가능한 개수
   final int _maxSelection = 3;
+  // 로딩 상태 관리
+  bool _isLoading = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _loadUserGoalTypes();
+  }
 
-  // 목표 유형 토글(선택/해제) 핸들러
+  // 기존 저장된 목표 유형 불러오기
+  Future<void> _loadUserGoalTypes() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final response = await supabase
+          .from('users')
+          .select('goal_types')
+          .eq('id', user.id)
+          .single();
+
+      if (response['goal_types'] != null) {
+        setState(() {
+          final List<dynamic> loadedData = response['goal_types'];
+          _selectedGoals.addAll(loadedData.map((e) => e.toString()));
+        });
+      }
+    } catch (e) {
+      debugPrint('데이터 로드 실패: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // 목표 유형 저장하기
+  Future<void> _saveGoalTypes() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) {
+      _showErrorNotification('로그인이 필요합니다.');
+      return;
+    }
+
+    if (_selectedGoals.isEmpty) {
+      _showErrorNotification('하나 이상의 목표 유형을 선택해주세요.');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      // users 테이블 업데이트
+      await supabase.from('users').update({
+        'goal_types': _selectedGoals,
+      }).eq('id', user.id);
+
+      if (mounted) {
+        _showSuccessNotification('성공적으로 저장되었습니다.');
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      debugPrint('저장 실패: $e');
+      if (mounted) {
+        _showErrorNotification('저장에 실패했습니다. 다시 시도해주세요.');
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // 목표 유형 토글
   void _handleToggle(String goalName) {
     setState(() {
-      if (_selectedGoals.contains(goalName)) {         // 이미 선택된 경우: 선택 해제
+      if (_selectedGoals.contains(goalName)) {
         _selectedGoals.remove(goalName);
-      } else {                                         // 선택되지 않은 경우:
+      } else {
         if (_selectedGoals.length < _maxSelection) {
-          // 최대 개수 미만일 때만 추가
           _selectedGoals.add(goalName);
         } else {
-          // 최대 개수 초과 시 알림
           _showErrorNotification('최대 3개까지만 선택할 수 있습니다.');
         }
       }
@@ -70,30 +138,12 @@ class _GoalTypeSelectorPageState extends State<GoalTypeSelectorPage> {
         backgroundColor: Colors.black87,
         behavior: SnackBarBehavior.fixed,
         duration: const Duration(seconds: 2),
-        padding: const EdgeInsets.symmetric(vertical: 18),
       ),
     );
   }
 
-
-  // 저장 버튼 클릭 핸들러
-  void _handleSave() {
-    if (_selectedGoals.isEmpty) {   // 선택된 항목이 하나도 없을 경우 오류 표시
-      _showErrorNotification('하나 이상의 목표 유형을 선택해주세요.');
-      return;
-    }
-    final message = '저장되었습니다.';
-    debugPrint(message);
-    _showSuccessNotification(message); // 성공 메시지 출력
-
-    // 실제 저장 로직은 여기에 구현
-
-
-  }
-
   @override
   Widget build(BuildContext context) {
-    // 렌더링 시 현재 선택 개수가 최대치에 도달했는지 확인
     final bool isMaxReached = _selectedGoals.length >= _maxSelection;
 
     return Scaffold(
@@ -102,14 +152,13 @@ class _GoalTypeSelectorPageState extends State<GoalTypeSelectorPage> {
         title: const Text(
           '목표 유형 설정',
           style: TextStyle(
-            color:PRIMARY_COLOR,
-            fontSize: 20,
-            fontFamily: 'Pretendard',
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
           ),
         ),
         backgroundColor: Colors.white,
-        elevation: 0, // 그림자 제거
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black), // 뒤로가기 버튼 색상
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
@@ -140,19 +189,21 @@ class _GoalTypeSelectorPageState extends State<GoalTypeSelectorPage> {
               ),
             ),
 
-            // 목표 유형 목록 (스크롤 가능)
-            Expanded( // 남은 공간을 모두 차지하도록 확장
-              child: ListView.builder(
+            // 목표 유형 목록
+            Expanded(
+              child: _isLoading && _selectedGoals.isEmpty
+                  ? const Center(child: CircularProgressIndicator()) // 초기 로딩 중일 때
+                  : ListView.builder(
                 itemCount: goalTypes.length,
                 itemBuilder: (context, index) {
                   final goal = goalTypes[index];
                   final bool isSelected = _selectedGoals.contains(goal);
 
-                  return _GoalTypeItem( // 개별 항목 위젯 호출
+                  return _GoalTypeItem(
                     name: goal,
                     isSelected: isSelected,
                     isMaxReached: isMaxReached,
-                    onTap: () => _handleToggle(goal), // 탭 시 토글 함수 호출
+                    onTap: () => _handleToggle(goal),
                   );
                 },
               ),
@@ -162,25 +213,9 @@ class _GoalTypeSelectorPageState extends State<GoalTypeSelectorPage> {
             Padding(
               padding: const EdgeInsets.only(bottom: 24.0, top: 16.0),
               child: ElevatedButton(
-                // 선택된 목표가 있을 때만 버튼 활성화, 없으면 비활성화
-                onPressed: () {
-                  _selectedGoals.isNotEmpty ? _handleSave : null;
-                  final message = '저장되었습니다.';
-                  debugPrint(message);
-                  _showSuccessNotification(message); // 성공 메시지 출력
-
-                  /*
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => MyPage()),
-                  );
-                   */
-                  Navigator.pop(context);
-                },
-                child: const Text(
-                  '저장',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                ),
+                onPressed: (_isLoading || _selectedGoals.isEmpty)
+                    ? null
+                    : _saveGoalTypes,
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 56),
                   shape: RoundedRectangleBorder(
@@ -189,6 +224,20 @@ class _GoalTypeSelectorPageState extends State<GoalTypeSelectorPage> {
                   backgroundColor: Colors.blue.shade600,
                   foregroundColor: Colors.white,
                   elevation: 5,
+                  disabledBackgroundColor: Colors.grey.shade300, // 비활성화 색상
+                ),
+                child: _isLoading
+                    ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2.5,
+                  ),
+                )
+                    : const Text(
+                  '저장',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -199,14 +248,14 @@ class _GoalTypeSelectorPageState extends State<GoalTypeSelectorPage> {
   }
 }
 
-// 개별 목표 유형 항목을 나타내는 StatelessWidget (재사용을 위한 분리)
 class _GoalTypeItem extends StatelessWidget {
   final String name;
   final bool isSelected;
   final bool isMaxReached;
-  final VoidCallback onTap; // 탭 이벤트 콜백 함수
+  final VoidCallback onTap;
 
   const _GoalTypeItem({
+    super.key,
     required this.name,
     required this.isSelected,
     required this.isMaxReached,
@@ -215,24 +264,21 @@ class _GoalTypeItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector( // 터치 이벤트를 감지
-      onTap: onTap, // 탭 발생 시 부모 위젯의 _handleToggle 호출
-      child: AnimatedContainer( // 상태 변화(선택/해제) 시 부드러운 애니메이션 효과 적용
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          // 배경색
           color: isSelected ? Colors.blue.shade50 : Colors.white,
           borderRadius: BorderRadius.circular(12),
-          // 테두리
           border: Border.all(
             color: isSelected ? Colors.blue.shade500 : Colors.grey.shade200,
             width: 2,
           ),
-          // 그림자
           boxShadow: isSelected
-              ? [ // 선택된 경우: 파란색 계열의 부드러운 그림자
+              ? [
             BoxShadow(
               color: Colors.blue.shade100.withOpacity(0.5),
               spreadRadius: 1,
@@ -240,7 +286,7 @@ class _GoalTypeItem extends StatelessWidget {
               offset: const Offset(0, 2),
             ),
           ]
-              : [ // 해제된 경우: 회색 계열의 약한 그림자
+              : [
             BoxShadow(
               color: Colors.grey.shade100,
               spreadRadius: 1,
@@ -261,13 +307,12 @@ class _GoalTypeItem extends StatelessWidget {
               ),
             ),
             Icon(
-              // 아이콘 변경: 선택 시 채워진 체크박스, 해제 시 윤곽선 체크박스
               isSelected ? Icons.check_box_rounded : Icons.check_box_outline_blank,
               color: isSelected
-                  ? Colors.blue.shade500 // 선택 시 파란색
-                  : (isMaxReached && !isSelected) // 최대치 도달 + 미선택 항목
-                  ? Colors.grey.shade300 // 회색으로 흐리게 (선택 불가능 시각화)
-                  : Colors.grey.shade400, // 일반 미선택 시 연한 회색
+                  ? Colors.blue.shade500
+                  : (isMaxReached && !isSelected)
+                  ? Colors.grey.shade300
+                  : Colors.grey.shade400,
               size: 28,
             ),
           ],

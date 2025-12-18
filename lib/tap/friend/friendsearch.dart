@@ -1,37 +1,119 @@
-//friendsearch.dart 친구추가
 import 'package:flutter/material.dart';
-import 'package:pbl/tap/friend/friendtap.dart';
 import 'package:pbl/const/colors.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-// 친구 데이터 모델 정의
 class Friend {
+  final String uid;
   final String nickname;
   final List<String> goalTypes;
-  final int grade; // 1부터 5
-  bool isFriend; // 이미 친구인지 여부
+  final int level;
+  String status;
 
   Friend({
+    required this.uid,
     required this.nickname,
     required this.goalTypes,
-    required this.grade,
-    required this.isFriend,
+    required this.level,
+    this.status = 'none',
   });
+
+  factory Friend.fromJson(Map<String, dynamic> json, String myId, List<Map<String, dynamic>> relations) {
+    String friendStatus = 'none';
+    final targetId = json['id'];
+
+    // 나와의 관계 확인
+    final relation = relations.firstWhere(
+          (r) => (r['requester_id'] == myId && r['receiver_id'] == targetId) ||
+          (r['requester_id'] == targetId && r['receiver_id'] == myId),
+      orElse: () => {},
+    );
+
+    if (relation.isNotEmpty) {
+      if (relation['status'] == 'accepted') {
+        friendStatus = 'accepted';
+      } else if (relation['requester_id'] == myId) {
+        friendStatus = 'pending'; // 내가 보냄
+      } else {
+        friendStatus = 'received'; // 상대가 보냄
+      }
+    }
+
+    return Friend(
+      uid: json['id'],
+      nickname: json['nickname'] ?? '알 수 없음',
+      goalTypes: json['goal_types'] != null
+          ? List<String>.from(json['goal_types'])
+          : [],
+      level: json['grade'] ?? 1,
+      status: friendStatus,
+    );
+  }
 }
 
+class FriendSearchService {
+  final supabase = Supabase.instance.client;
 
-// 가상 데이터 (Mock Data) 생성
-final List<Friend> mockFriends = [
-  Friend(nickname: 'apple', goalTypes: ['입시', '시험'], grade: 4, isFriend: false),
-  Friend(nickname: 'strawberry', goalTypes: ['운동', '식단', '취미'], grade: 5, isFriend: true),
-  Friend(nickname: 'banana', goalTypes: ['취업'], grade: 2, isFriend: false),
-  Friend(nickname: 'peach', goalTypes: ['자기개발', '취미', '기타'], grade: 1, isFriend: false),
-  Friend(nickname: 'melon', goalTypes: ['시험', '취업'], grade: 3, isFriend: false),
-  Friend(nickname: 'pineapple', goalTypes: ['운동', '식단'], grade: 3, isFriend: true),
-  Friend(nickname: 'pear', goalTypes: ['취미', '자기개발'], grade: 1, isFriend: false),
-];
+  // 유저 검색
+  Future<List<Friend>> searchUsers(String query) async {
+    final myId = supabase.auth.currentUser?.id;
+    if (myId == null || query.isEmpty) return [];
 
+    try {
+      // 닉네임으로 유저 검색 (나 제외)
+      final usersResponse = await supabase
+          .from('users')
+          .select()
+          .ilike('nickname', '$query%') // 해당 검색어로 시작하는 닉네임
+          .neq('id', myId);
 
-// 친구 검색 화면 위젯
+      // 친구 관계 조회
+      final relationsResponse = await supabase
+          .from('friends')
+          .select()
+          .or('requester_id.eq.$myId,receiver_id.eq.$myId');
+
+      final relations = List<Map<String, dynamic>>.from(relationsResponse);
+      final users = List<Map<String, dynamic>>.from(usersResponse);
+
+      // 매핑
+      return users.map((u) => Friend.fromJson(u, myId, relations)).toList();
+    } catch (e) {
+      debugPrint("검색 에러: $e");
+      return [];
+    }
+  }
+
+  // 친구 요청 보내기
+  Future<bool> sendFriendRequest(String targetId) async {
+    final myId = supabase.auth.currentUser?.id;
+    if (myId == null) return false;
+    try {
+      await supabase.from('friends').insert({
+        'requester_id': myId,
+        'receiver_id': targetId,
+        'status': 'pending',
+      });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // 요청 취소
+  Future<bool> cancelRequest(String targetId) async {
+    final myId = supabase.auth.currentUser?.id;
+    if (myId == null) return false;
+    try {
+      await supabase.from('friends').delete()
+          .eq('requester_id', myId)
+          .eq('receiver_id', targetId);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+}
+
 class FriendSearchScreen extends StatefulWidget {
   const FriendSearchScreen({super.key});
 
@@ -40,31 +122,29 @@ class FriendSearchScreen extends StatefulWidget {
 }
 
 class _FriendSearchScreenState extends State<FriendSearchScreen> {
+  final FriendSearchService _friendService = FriendSearchService();
   String _searchQuery = '';
-  List<Friend> _searchResults = mockFriends;
+  List<Friend> _searchResults = [];
+  bool _isLoading = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _searchResults = mockFriends;
-  }
-
-  // 검색 로직
-  void _performSearch(String query) {
+  // 검색 실행
+  Future<void> _performSearch(String query) async {
     setState(() {
-      _searchQuery = query.toLowerCase();
-      if (_searchQuery.isEmpty) {
-        _searchResults = mockFriends;
-      } else {
-        _searchResults = mockFriends.where((friend) {
-          final nicknameLower = friend.nickname.toLowerCase();
-          final goalTypesLower = friend.goalTypes.map((type) => type.toLowerCase());
-
-          return nicknameLower.startsWith(_searchQuery) ||
-              goalTypesLower.any((type) => type.startsWith(_searchQuery));
-        }).toList();
-      }
+      _searchQuery = query.trim();
     });
+
+    if (_searchQuery.isEmpty) {
+      setState(() => _searchResults = []);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final results = await _friendService.searchUsers(_searchQuery);
+      setState(() => _searchResults = results);
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   // 검색 입력 위젯
@@ -75,7 +155,7 @@ class _FriendSearchScreenState extends State<FriendSearchScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 8.0),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(50.0), // 둥근 모서리
+          borderRadius: BorderRadius.circular(12.0),
           border: Border.all(color: Colors.grey.shade300),
           boxShadow: [
             BoxShadow(
@@ -86,14 +166,19 @@ class _FriendSearchScreenState extends State<FriendSearchScreen> {
           ],
         ),
         child: TextField(
-          onChanged: _performSearch,
-          decoration: const InputDecoration(
-            hintText: '친구 이름 또는 목표 유형으로 검색',
-            hintStyle: TextStyle(color: Colors.grey),
-            border: InputBorder.none, // 기본 밑줄 제거
-            contentPadding: EdgeInsets.symmetric(vertical: 12.0,horizontal: 15),
-            suffixIcon: Icon(Icons.search, color: Colors.black),
+          onSubmitted: _performSearch,
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            hintText: '친구 이름으로 검색',
+            hintStyle: const TextStyle(color: Colors.grey),
+            border: InputBorder.none,
+            suffixIcon: IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: () => _performSearch(_searchQuery),
+            ),
+            contentPadding: const EdgeInsets.symmetric(vertical: 12.0),
           ),
+          onChanged: (val) => _searchQuery = val,
         ),
       ),
     );
@@ -106,34 +191,36 @@ class _FriendSearchScreenState extends State<FriendSearchScreen> {
       // 이부분 통일하기
       appBar: AppBar(
         title: const
-          Text('친구 검색',
-              style: TextStyle(
-                color: PRIMARY_COLOR,
-                fontSize: 20,
-                fontFamily: 'Pretendard',
-                fontWeight: FontWeight.w800,
-              ),
+        Text('친구 검색',
+          style: TextStyle(
+            color: PRIMARY_COLOR,
+            fontSize: 20,
+            fontFamily: 'Pretendard',
+            fontWeight: FontWeight.w800,
+          ),
         ),
         toolbarHeight: 60,
         backgroundColor: Colors.white, // 이미지의 상단 바 색상
       ),
-
       body: Column(
         children: [
-          const SizedBox(height: 10),
+          const SizedBox(height: 30),
 
-          // 검색 입력바
+          // 검색창
           _buildSearchBar(),
 
-          const SizedBox(height: 10),
+          const SizedBox(height: 20),
 
-          // 검색 결과 목록
+          // 결과 리스트
           Expanded(
-            child: ListView.builder(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _searchResults.isEmpty && _searchQuery.isNotEmpty
+                ? const Center(child: Text("검색 결과가 없습니다."))
+                : ListView.builder(
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               itemCount: _searchResults.length,
               itemBuilder: (context, index) {
-                // 친구 상태 변화를 반영하기 위해 FriendListItem을 사용
                 return FriendListItem(friend: _searchResults[index]);
               },
             ),
@@ -144,8 +231,6 @@ class _FriendSearchScreenState extends State<FriendSearchScreen> {
   }
 }
 
-
-// 친구 목록 항목 위젯
 class FriendListItem extends StatefulWidget {
   final Friend friend;
   const FriendListItem({required this.friend, super.key});
@@ -155,21 +240,22 @@ class FriendListItem extends StatefulWidget {
 }
 
 class _FriendListItemState extends State<FriendListItem> {
+  final FriendSearchService _friendService = FriendSearchService();
+  bool _isProcessing = false;
 
-  // 목표 유형을 칩 형태로 표시하는 위젯 (회색 배경, 둥근 모서리)
+  // 목표 유형 칩
   Widget _buildGoalTypeChip(String type) {
     return Container(
-      // Wrap으로 변경 시, 세로 간격을 위해 bottom 마진 추가
       margin: const EdgeInsets.only(right: 6.0, bottom: 4.0),
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
       decoration: BoxDecoration(
-        color: Colors.grey[300], // 회색 배경
-        borderRadius: BorderRadius.circular(16.0), // 둥근 모서리
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(16.0),
       ),
       child: Text(
         '#$type',
         style: TextStyle(
-          fontSize: 11, // 목표 유형 글자 크기
+          fontSize: 11,
           color: Colors.grey[700],
           fontWeight: FontWeight.w500,
         ),
@@ -177,12 +263,40 @@ class _FriendListItemState extends State<FriendListItem> {
     );
   }
 
-  // 친구 상태 토글 함수
-  void _toggleFriendship() {
-    setState(() {
-      widget.friend.isFriend = !widget.friend.isFriend;
-      debugPrint('${widget.friend.nickname} 친구 상태: ${widget.friend.isFriend ? '친구됨' : '친구 아님'}');
-    });
+  // 버튼 클릭 핸들러
+  Future<void> _handleButtonPress() async {
+    if (_isProcessing) return;
+    setState(() => _isProcessing = true);
+
+    try {
+      // 친구 아님 -> 요청 보내기
+      if (widget.friend.status == 'none') {
+        final success = await _friendService.sendFriendRequest(widget.friend.uid);
+        if (success) {
+          setState(() => widget.friend.status = 'pending');
+          if(mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('${widget.friend.nickname}님에게 요청을 보냈습니다.')),
+            );
+          }
+        }
+      }
+      // 요청 보냄 -> 요청 취소
+      else if (widget.friend.status == 'pending') {
+        final success = await _friendService.cancelRequest(widget.friend.uid);
+        if (success) {
+          setState(() => widget.friend.status = 'none');
+          if(mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('친구 요청을 취소했습니다.')),
+            );
+          }
+        }
+      }
+      // 이미 친구이거나 받은 요청은 여기서 처리하지 않음 (버튼 비활성화)
+    } finally {
+      if(mounted) setState(() => _isProcessing = false);
+    }
   }
 
   @override
@@ -190,86 +304,114 @@ class _FriendListItemState extends State<FriendListItem> {
     final gradeBackgroundColor = Colors.grey[200];
     const gradeTextColor = Colors.black;
 
-    return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // 프로필 이미지 (아바타)
-              const CircleAvatar(
-                radius: 24,
-                backgroundColor: Colors.grey,
-                child: Icon(Icons.person, color: Colors.white, size: 24),
-              ),
-              const SizedBox(width: 12),
+    // 상태에 따른 버튼 텍스트 및 스타일 결정
+    String btnText = '친구 추가';
+    Color btnColor = Colors.blue;
+    bool isDisabled = false;
 
-              // 닉네임 및 목표 유형
-              Expanded( // Expanded로 감싸서 남은 공간을 모두 차지하도록 보장
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 닉네임
-                    Text(
-                      widget.friend.nickname,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    // 목표 유형 (Wrap 위젯으로 변경하여 줄 바꿈 처리)
-                    Wrap(
-                      spacing: 0,
-                      runSpacing: 0,
-                      children: widget.friend.goalTypes
-                          .take(3)
-                          .map((type) => _buildGoalTypeChip(type))
-                          .toList(),
-                    ),
-                  ],
+    switch (widget.friend.status) {
+      case 'accepted':
+        btnText = '친구';
+        btnColor = Colors.grey;
+        isDisabled = true;
+        break;
+      case 'pending':
+        btnText = '요청됨';
+        btnColor = Colors.grey;
+        break;
+      case 'received':
+        btnText = '수락 대기'; // 알림 탭에서 수락해야 함
+        btnColor = Colors.grey;
+        isDisabled = true;
+        break;
+      case 'none':
+      default:
+        btnText = '친구 추가';
+        btnColor = POINT_COLOR;
+        break;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // 프로필 이미지
+          const CircleAvatar(
+            radius: 24,
+            backgroundColor: Colors.grey,
+            child: Icon(Icons.person, color: Colors.white, size: 24),
+          ),
+          const SizedBox(width: 12),
+
+          // 닉네임 및 목표 유형
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.friend.nickname,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
-              ),
-              const SizedBox(width: 8),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 0,
+                  runSpacing: 0,
+                  children: widget.friend.goalTypes
+                      .take(3)
+                      .map((type) => _buildGoalTypeChip(type))
+                      .toList(),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
 
-              // 등급 표시
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: gradeBackgroundColor,
+          // 레벨 표시
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: gradeBackgroundColor,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              '레벨 ${widget.friend.level}',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: gradeTextColor,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // 친구 추가 버튼
+          SizedBox(
+            width: 85,
+            child: ElevatedButton(
+              onPressed: isDisabled ? null : _handleButtonPress,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: btnColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
-                  '등급 ${widget.friend.grade}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                    color: gradeTextColor,
-                  ),
-                ),
+                elevation: 0,
+                // 비활성화 상태일 때 스타일
+                disabledBackgroundColor: Colors.grey.shade300,
+                disabledForegroundColor: Colors.white,
               ),
-              const SizedBox(width: 5),
-
-              // 친구 추가 버튼
-              SizedBox(
-                width: 85,
-                child: ElevatedButton(
-                  onPressed: _toggleFriendship,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: widget.friend.isFriend ? Colors.grey : Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: Text(
-                    widget.friend.isFriend ? '친구 요청' : '친구 추가',
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                ),
+              child: _isProcessing
+                  ? const SizedBox(width:12, height:12, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : Text(
+                btnText,
+                style: const TextStyle(fontSize: 12),
               ),
-            ],
+            ),
           ),
-        )
+        ],
+      ),
     );
   }
 }

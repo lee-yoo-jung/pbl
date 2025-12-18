@@ -1,23 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:pbl/screen/home_screen.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:pbl/tap/mypages/component/notification_service.dart'; //알림 설정 파일
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:pbl/tap/mypages/component/notification_service.dart';
+import 'package:pbl/login/login_app.dart';
 
 // <최종 실행 파일 실행>
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting();
+void main() async{
+  WidgetsFlutterBinding.ensureInitialized();  //플러터 프레임워크 준비 대기
 
+  await dotenv.load(fileName: ".env");
   await Supabase.initialize(
-    url: 'https://fjswddefchdhivkvpffh.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqc3dkZGVmY2hkaGl2a3ZwZmZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgyODUwNDEsImV4cCI6MjA3Mzg2MTA0MX0.tQZfbh8PhcmnhWwtTQCSDiu_W9Au4pZA-lGDNz5wddE',
+    url: dotenv.env['PROJECT_URL']!,
+    anonKey: dotenv.env['PROJECT_API_KEY']!,
   );
-  await initializeDateFormatting();           //다국적화
-  await NotificationService().init();         // 알림 서비스 초기화
 
+  await NotificationService().init();
+
+
+
+  await initializeDateFormatting();           //다국적화
   runApp(
       MaterialApp(
         localizationsDelegates: [
@@ -29,7 +34,7 @@ Future<void> main() async {
           const Locale('ko','KR'),
         ],
         debugShowCheckedModeBanner: false, //debug 표시 제거
-        home:MainScreen(),  //최종 실행 파일
+        home:LoginApp(),  //최종 실행 파일
       )
   );
 }

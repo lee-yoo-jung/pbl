@@ -1,27 +1,35 @@
-//로컬 푸시 알람 lib/tap/mypages/component/notification_service.dart
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/data/latest.dart' as tz; //tz=timezone
+import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:pbl/tap/calender/component/event.dart';
-import 'package:flutter/foundation.dart'; // debugPrint용
+import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:pbl/services/supabase_calendar_service.dart';
 
 class NotificationService {
   // 싱글톤 패턴
   static final NotificationService _instance = NotificationService._internal();
+
   factory NotificationService() => _instance;
+
   NotificationService._internal();
 
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
   FlutterLocalNotificationsPlugin();
 
+  bool _isInitialized = false; // 초기화 상태 확인 플래그
+
+  final CalendarService _calendarService = CalendarService();
+
   Future<void> init() async {
-    // 시간대 초기화 (필수)
+    if (_isInitialized) return;
+
+    // 시간대 초기화
     tz.initializeTimeZones();
 
     // 안드로이드 설정
     const AndroidInitializationSettings initializationSettingsAndroid =
-    AndroidInitializationSettings('@mipmap/ic_launcher'); // 앱 아이콘 사용
+    AndroidInitializationSettings('@mipmap/ic_launcher');
 
     // iOS 설정
     const DarwinInitializationSettings initializationSettingsIOS =
@@ -43,21 +51,57 @@ class NotificationService {
       },
     );
 
+    // 알림 권한 요청
     var status = await Permission.notification.request();
-    debugPrint('Android 알림 권한 상태: $status');
+    debugPrint('알림 권한 상태: $status');
+
+    _isInitialized = true; // 초기화 완료 표시
+    debugPrint('NotificationService 초기화 완료');
   }
 
-  // [통합] 알림 스위치 ON/OFF 관리 함수
+  // 알림 스위치 ON/OFF 관리 함수
   Future<void> setNotificationEnabled(bool isEnabled) async {
-    // 1. 기존 알림 모두 취소 (OFF 상태이거나, 목록 갱신을 위해 초기화)
-    await flutterLocalNotificationsPlugin.cancelAll();
-    debugPrint('모든 알림 취소됨');
+    if (!_isInitialized) {
+      debugPrint('알림 서비스가 초기화되지 않아 초기화를 시도합니다.');
+      await init();
+    }
 
-    // 2. 스위치가 ON이면, eventsList의 일정들을 예약
+    // 기존 알림 모두 취소
+    try {
+      await flutterLocalNotificationsPlugin.cancelAll();
+      debugPrint('기존 알림 모두 취소됨 (재설정을 위해)');
+    } catch (e) {
+      debugPrint('알림 취소 중 에러 발생: $e');
+      debugPrint('플러그인 재초기화 후 다시 시도합니다...');
+
+      await init();
+      try {
+        await flutterLocalNotificationsPlugin.cancelAll();
+        debugPrint('재시도 성공: 알림 취소 완료');
+      } catch (e2) {
+        debugPrint('재시도 실패: $e2');
+        return;
+      }
+    }
+
+    // 스위치가 ON이면, 일정들을 불러와서 예약
     if (isEnabled) {
-      // eventsList는 event.dart 등에서 전역으로 관리된다고 가정합니다.
-      // 만약 전역 변수가 아니라면 이 함수의 파라미터로 List<Event> events를 받아야 합니다.
-      await _scheduleAllCalendarEvents(eventsList);
+      try {
+        debugPrint('DB에서 목표 불러오는 중...');
+
+        // 필요한 시점에 서비스 생성
+        final calendarService = CalendarService();
+        List<Event> dbEvents = await calendarService.getGoals();
+
+        if (dbEvents.isNotEmpty) {
+          await _scheduleAllCalendarEvents(dbEvents);
+          debugPrint('${dbEvents.length}개의 목표에 대한 알림 예약 완료');
+        } else {
+          debugPrint('예약할 목표가 DB에 없습니다.');
+        }
+      } catch (e) {
+        debugPrint('알림 예약 중 오류 발생: $e');
+      }
     }
   }
 
@@ -66,25 +110,32 @@ class NotificationService {
     final now = tz.TZDateTime.now(tz.local);
     int scheduledCount = 0;
 
-    for (int i = 0; i < events.length; i++) {
-      Event event = events[i];
+    for (var event in events) {
+      if (event.id == null) continue;
 
-      // Event 객체에 title과 startDate가 있다고 가정합니다.
-      // startDate를 Timezone 인식 시간으로 변환
-      tz.TZDateTime scheduledDate = tz.TZDateTime.from(event.startDate, tz.local);
-
-      // [핵심] 현재 시간보다 미래에 있는 일정만 알림 예약
-      if (scheduledDate.isAfter(now)) {
-        await scheduleNotification(
-          id: i, // 고유 ID (리스트 인덱스 사용, 필요시 event.id 사용)
-          title: "일정 알림", // 혹은 event.title
-          body: "${event.title} 일정이 있습니다.", // 상세 내용
-          scheduledDate: scheduledDate,
+      try {
+        tz.TZDateTime scheduledDate = tz.TZDateTime.from(
+          event.startDate,
+          tz.local,
         );
-        scheduledCount++;
+
+        // 현재 시간보다 미래인지 확인
+        if (scheduledDate.isAfter(now)) {
+          int notificationId = event.id.hashCode;
+
+          await scheduleNotification(
+            id: notificationId,
+            title: "목표 알림: ${event.title}",
+            body: "${event.title} 목표가 예정되어 있습니다. 파이팅!",
+            scheduledDate: scheduledDate,
+          );
+          scheduledCount++;
+        }
+      } catch (e) {
+        debugPrint('개별 일정 예약 실패 (${event.title}): $e');
       }
     }
-    debugPrint('총 $scheduledCount 개의 미래 일정이 알림 예약되었습니다.');
+    debugPrint('총 $scheduledCount 개의 미래 일정이 예약되었습니다.');
   }
 
   // 실제 알림 예약 실행 함수
@@ -101,9 +152,9 @@ class NotificationService {
       scheduledDate,
       const NotificationDetails(
         android: AndroidNotificationDetails(
-          'calendar_event_channel', // 채널 ID
-          '일정 알림', // 채널 이름
-          channelDescription: '캘린더 일정에 맞춘 알림입니다.',
+          'calendar_event_channel',
+          '목표 일정 알림',
+          channelDescription: '목표 시작일에 맞춰 알림을 보냅니다.',
           importance: Importance.max,
           priority: Priority.high,
         ),

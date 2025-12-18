@@ -6,12 +6,7 @@ import 'package:pbl/const/colors.dart';
 import 'package:pbl/tap/calender/component/event.dart';
 import 'package:pbl/tap/calender/component/color_picker_dialog.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
-
-
-
-//<목표의 기간과 제목을 입력&저장>
-
-List<String> usersList=['사용자2','사용자3','사용자4']; //친구 목록
+import 'package:pbl/services/friend_service.dart';
 
 class ScheduleBottomSheet extends StatefulWidget{
   ScheduleBottomSheet({Key? key }):super(key:key);
@@ -20,20 +15,37 @@ class ScheduleBottomSheet extends StatefulWidget{
   State<ScheduleBottomSheet> createState()=>_SchedualBottomSheetState();
 }
 
-
 class _SchedualBottomSheetState extends State<ScheduleBottomSheet>{
-  DateTime? startDate;      //시작일
-  DateTime? endDate;        //종료
-  DateTime? selectedDate;   //선택한 날짜
-  Map<DateTime, List<Event>> events = {};  //선택된 범위
-  List<String> selected=[]; //공동 목표 사용자들
-  Color? color;   // 목표별 색깔 선택
-  bool? secret=false;   //공개로 기본설정
-  String selectedEmoji = '😊';
+  DateTime? startDate;
+  DateTime? endDate;
+
+  List<String> selected=[];
+  List<String> friendList = [];
+  final FriendService _friendService = FriendService();
+
+  Color? color;
+  bool close_open = false;
+  String selectedEmoji = '✨';
 
   late TextEditingController goalController=TextEditingController(); //입력한 텍스트를 가져오기
   late TextEditingController hashController=TextEditingController(); //입력한 텍스트를 가져오기
-  bool close_open=false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFriends();
+  }
+
+  Future<void> _loadFriends() async {
+    try {
+      final friendsData = await _friendService.getFriendsList();
+      setState(() {
+        friendList = friendsData.map((e) => (e['nickname'] ?? '알 수 없음').toString()).toList();
+      });
+    } catch (e) {
+      debugPrint("친구 목록 로드 실패: $e");
+    }
+  }
 
   void _pickEmoji() async {
     final pickedEmoji = await showModalBottomSheet<String>(
@@ -46,6 +58,12 @@ class _SchedualBottomSheetState extends State<ScheduleBottomSheet>{
             onEmojiSelected: (category, emoji) {
               Navigator.pop(context, emoji.emoji);
             },
+            config: const Config(
+              emojiViewConfig: EmojiViewConfig(
+                columns: 7,
+                emojiSizeMax: 32.0,
+              ),
+            ),
           ),
         );
       },
@@ -80,6 +98,7 @@ class _SchedualBottomSheetState extends State<ScheduleBottomSheet>{
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // 기간 설정 UI
                 Align(
                   alignment: Alignment.centerLeft,
                   child: const Padding(
@@ -127,9 +146,7 @@ class _SchedualBottomSheetState extends State<ScheduleBottomSheet>{
                               ),
                             ),
                           ),
-
                           const SizedBox(width: 15),
-
                           Expanded(
                             child: ElevatedButton(
                               onPressed: () => selectDate(isStart: false), // 종료일 선택
@@ -169,11 +186,11 @@ class _SchedualBottomSheetState extends State<ScheduleBottomSheet>{
                   controller: goalController, //입력한 목표를 가져오기
                 ),
 
-                // 목표별 색상 선택
+                // 목표별 색상 및 이모지 선택
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween, // 💡 두 그룹을 양 끝으로 벌립니다.
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // 1. 색상 선택 그룹
+                    // 색상 선택 그룹
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -201,7 +218,6 @@ class _SchedualBottomSheetState extends State<ScheduleBottomSheet>{
                               setState(() => color = newColor);
                             }
                           },
-
                           // 현재 색상 표시
                           child: Container(
                             width: 20,
@@ -215,7 +231,7 @@ class _SchedualBottomSheetState extends State<ScheduleBottomSheet>{
                       ],
                     ),
 
-                    // 2. 이모지 선택 그룹
+                    // 이모지 선택 그룹
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -235,6 +251,7 @@ class _SchedualBottomSheetState extends State<ScheduleBottomSheet>{
                           onPressed: _pickEmoji,
                           icon: Text(
                             selectedEmoji,
+                            style: const TextStyle(fontSize: 20),
                           ),
                         ),
                       ],
@@ -244,38 +261,55 @@ class _SchedualBottomSheetState extends State<ScheduleBottomSheet>{
 
                 const SizedBox(height: 10),
 
+                // 친구 공유 및 공개 설정
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween, // 위젯들을 양 끝으로 벌림
                   children: [
-                    //공동목표 수립을 위해 친구 목록에서 친구 선택(다중선택 가능)
+                    //공동목표 수립을 위해 친구 목록에서 친구 선택
                     Expanded(
                       child: TextButton(
                         onPressed: () async{
-                          //이 다이얼로그에서 반환되는 값은 List<String>으로 picked에 저장됨
+                          if (friendList.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('친구 목록이 비어있습니다.')),
+                            );
+                            return;
+                          }
+
                           final picked = await showDialog<List<String>>(
                             context: context,
                             builder: (context){
                               return AlertDialog(
                                 title: Text(
-                                    '친구 목록',
+                                  '친구 목록',
+                                  style: TextStyle(
+                                      fontFamily: 'Pretendard',
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.black
+                                  ),
                                 ),
                                 backgroundColor: Colors.white,
                                 content: StatefulBuilder(               //상태 업데이트가 가능하게
                                   builder: (context,setState){
-                                    return Directionality(
-                                      textDirection: TextDirection.ltr,
-                                      child:  Column(
-                                        mainAxisSize: MainAxisSize.min, //다이얼로그의 크기=체크리스트 크기
-                                        children: usersList.map((item){ //각 item에 대한 체크박스 생성
+                                    final maxDialogHeight = MediaQuery.of(context).size.height * 0.5;
+                                    return SizedBox(
+                                      width: double.maxFinite,
+                                      height: maxDialogHeight,
+                                      child: ListView.builder(
+                                        shrinkWrap: true,
+                                        itemCount: friendList.length,
+                                        itemBuilder: (context, index) {
+                                          final item = friendList[index];
                                           //다중선택 가능한 체크박스
                                           return CheckboxListTile(
                                             title: Text(
                                               item,
                                               style: TextStyle(
-                                                fontFamily: "Pretendard",
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.w400,
-                                                color: Colors.black
+                                                  fontFamily: "Pretendard",
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w400,
+                                                  color: Colors.black
                                               ),
                                             ),
                                             value: selected.contains(item), //체크박스가 체크되어 있는지
@@ -288,6 +322,7 @@ class _SchedualBottomSheetState extends State<ScheduleBottomSheet>{
                                                 }
                                               });
                                             },
+                                            activeColor: PRIMARY_COLOR,
                                             fillColor: MaterialStateProperty.resolveWith<Color>(
                                                     (Set<MaterialState> states){
                                                   if(states.contains(MaterialState.selected)){
@@ -297,19 +332,19 @@ class _SchedualBottomSheetState extends State<ScheduleBottomSheet>{
                                                 }
                                             ),
                                           );
-                                        }).toList(),
+                                        },
                                       ),
                                     );
                                   },
                                 ),
                                 actions: [
-                                  TextButton( //선택없이 닫기
+                                  TextButton(
                                       onPressed: ()=>Navigator.pop(context),
-                                      child: Text('취소')
+                                      child: Text('취소', style: TextStyle(color: PRIMARY_COLOR))
                                   ),
-                                  TextButton( //선택한 리스트 반환
+                                  TextButton(
                                       onPressed: ()=>Navigator.pop(context,selected),
-                                      child: Text('확인')
+                                      child: Text('확인', style: TextStyle(color: PRIMARY_COLOR))
                                   ),
                                 ],
                               );
@@ -377,7 +412,7 @@ class _SchedualBottomSheetState extends State<ScheduleBottomSheet>{
 
                 //저장 버튼
                 ElevatedButton(
-                  onPressed: savegoal,    //눌렀을 때 savegoal 함수가 실행하기
+                  onPressed: () => savegoal(context),
                   style: ElevatedButton.styleFrom(
                       backgroundColor: PRIMARY_COLOR,
                       foregroundColor: Colors.white,
@@ -422,7 +457,6 @@ class _SchedualBottomSheetState extends State<ScheduleBottomSheet>{
               onSurface: Colors.black,    // 본문 (날짜) 텍스트 색상
             ),
             dialogBackgroundColor: Colors.white, // 다이얼로그 배경색
-
             textTheme: ThemeData.light().textTheme.apply(
               fontFamily: 'Pretendard',
             ),
@@ -460,7 +494,7 @@ class _SchedualBottomSheetState extends State<ScheduleBottomSheet>{
       },
     );
 
-    // 사용자가 날짜를 선택했으면 상태 업데이트 (기존 로직 유지)
+    // 사용자가 날짜를 선택했으면 상태 업데이트
     if (picked != null) {
       setState(() {
         if (isStart) {
@@ -480,17 +514,16 @@ class _SchedualBottomSheetState extends State<ScheduleBottomSheet>{
 
 
   //저장버튼
-  void savegoal(){
-    final goal=goalController.text;   //입력한 목표(event)을 가져오기
-    String hashtags = hashController.text ?? "";
+  void savegoal(BuildContext ctx){
+    final goal = goalController.text;
 
-    //시작 날짜,종료 날짜,목표가 하나라도 비어있으면, 함수 종료
-    if(startDate==null ||endDate==null || goal.isEmpty){
+    if(startDate == null || endDate == null || goal.isEmpty){
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        const SnackBar(content: Text("목표와 기간을 모두 입력해주세요.")),
+      );
       return;
     }
 
-
-    // Event 객체 생성
     final newEvent = Event(
       title: goal,
       startDate: startDate!,
@@ -498,17 +531,10 @@ class _SchedualBottomSheetState extends State<ScheduleBottomSheet>{
       togeter: selected,
       color: color ?? PRIMARY_COLOR,
       emoji: selectedEmoji,
-      secret: close_open!,
+      secret: close_open,
+      plans: [],
     );
 
-    // 날짜별로 분리하여 Map에 저장
-    for (var day = startDate!; !day.isAfter(endDate!); day = day.add(Duration(days: 1))) {
-      final dateKey = DateTime(day.year, day.month, day.day); // 시간 제거
-      if (!events.containsKey(dateKey)) events[dateKey] = [];
-      events[dateKey]!.add(newEvent);
-    }
-
-
-    Navigator.pop(context, newEvent); //캘린더로 이동
+    Navigator.pop(context, newEvent);
   }
 }

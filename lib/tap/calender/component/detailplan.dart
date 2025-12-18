@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:pbl/tap/calender/component/custom_text_field.dart';
 import 'package:pbl/const/colors.dart';
 import 'package:pbl/tap/calender/component/event.dart';
 import 'package:pbl/const/TimePicker.dart';
@@ -8,6 +7,7 @@ import 'package:pbl/const/TimePicker.dart';
 //<계획의 시간과 내용을 입력하는 페이지>
 
 class Detailplan extends StatefulWidget {
+
   final Event event;
   final DateTime initialDate;
 
@@ -33,12 +33,10 @@ class _Detailplan extends State<Detailplan> {
 
   String? selectedType;
 
-  //페이지가 생성될 때 한번만 initSate() 생성
   @override
   void initState() {
     super.initState();
-    selectedDate = widget.initialDate;  //부모 StatefulWidget로 전달받은 값을 선택한 날짜에 넣기
-
+    selectedDate = widget.initialDate;
   }
 
   //DateTime타입을 통일된 형식으로 설정 YYYY.MM.DD
@@ -56,7 +54,6 @@ class _Detailplan extends State<Detailplan> {
 
         //날짜 배치와 시간 설정, 계획 텍스트, 저장 버튼을 세로로 배치
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch, //가로로 각 요소를 늘리기,
           children: [
             Text( _formatDate(selectedDate!),
@@ -68,7 +65,7 @@ class _Detailplan extends State<Detailplan> {
               ),
             ), //선택한 날짜 표시 = 계획을 추가할 날짜
 
-            const SizedBox(height: 10),  //날짜와 계획명 사이의 간격
+            const SizedBox(height: 10),  //날짜와 시간 설정의 간격
 
             //계획을 적는 필드
             SizedBox(
@@ -105,7 +102,7 @@ class _Detailplan extends State<Detailplan> {
             ),
 
             const SizedBox(height: 20),  // 계획 필드와 시간 필드 사이의 간격
-            
+
             //시간 설정
             SizedBox(
               height: 40,
@@ -158,7 +155,7 @@ class _Detailplan extends State<Detailplan> {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 20), // 계획 필드와 유형 필드 사이의 간격
 
             // 유형을 고르는 필드
@@ -191,12 +188,12 @@ class _Detailplan extends State<Detailplan> {
                 selectedItemBuilder: (BuildContext context) {
                   return planTypes.map((String type) {
                     return Text(
-                      type,
-                      style: TextStyle(
-                        fontFamily: 'Pretendard',
-                        fontSize: 16,
-                        color: PRIMARY_COLOR,
-                      )
+                        type,
+                        style: TextStyle(
+                          fontFamily: 'Pretendard',
+                          fontSize: 16,
+                          color: PRIMARY_COLOR,
+                        )
                     );
                   }).toList();
                 },
@@ -205,10 +202,10 @@ class _Detailplan extends State<Detailplan> {
                 hint: Text(
                   '유형을 선택해주세요',
                   style: TextStyle(
-                    fontFamily: 'Pretendard',
-                    fontSize: 16,
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w500
+                      fontFamily: 'Pretendard',
+                      fontSize: 16,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500
                   ),
                 ),
 
@@ -230,7 +227,7 @@ class _Detailplan extends State<Detailplan> {
             ),
 
             const SizedBox(height: 16), // 계획을 적는 필드와 저장 버튼의 간격 설정
-            
+
             //저장 버튼
             ElevatedButton(
               onPressed: savePlan, //눌렀을 때 savePlan 함수가 실행하기
@@ -279,7 +276,8 @@ class _Detailplan extends State<Detailplan> {
       int.parse(timeParts[1]),
     );
 
-    final newPlan = Plan(text: planController.text, selectdate:selectedDateTime, type: selectedType!); //계획과 DateTime 타입으로 만든 날짜와 시간을 Plan 클래스에 담아 저장
+    final newPlan = Plan(text: planController.text, selectdate:selectedDateTime, hashtag: selectedType!); //계획과 DateTime 타입으로 만든 날짜와 시간을 Plan 클래스에 담아 저장
+
     Navigator.pop(context, newPlan); // 캘린더 페이지로 newPlan을 반환
   }
 }
