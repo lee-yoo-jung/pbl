@@ -9,6 +9,9 @@ import 'package:pbl/services/supabase_calendar_service.dart';
 import 'package:pbl/tap/calender/board/board_page.dart';
 import 'package:pbl/services/badge_service.dart';
 import 'package:pbl/services/level_service.dart';
+import 'package:badges/badges.dart' as badges;
+import 'package:pbl/tap/calender/component/alarm_notifer.dart';
+
 
 //<메인 화면(캘린더) 구상>
 
@@ -24,9 +27,8 @@ class _CalenderviewState extends State<Calenderview>{
   List<Event> eventsList = [];
   bool _isLoading = false;
 
-
   //선택된 날짜를 관리할 변수
-  DateTime selectedDate=DateTime.utc(
+  DateTime selectedDate = DateTime.utc(
     DateTime.now().year,
     DateTime.now().month,
     DateTime.now().day,
@@ -37,6 +39,7 @@ class _CalenderviewState extends State<Calenderview>{
   void initState() {
     super.initState();
     _loadEvents();
+    loadAlarmCount();
   }
 
   Future<void> _loadEvents() async {
@@ -49,7 +52,7 @@ class _CalenderviewState extends State<Calenderview>{
     } catch (e) {
       print("데이터 로드 실패: $e");
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -72,10 +75,8 @@ class _CalenderviewState extends State<Calenderview>{
     return map;
   }
 
-
   @override
   Widget build(BuildContext context) {
-    // 로딩 중 표시 (데이터가 없을 때만)
     if (_isLoading && eventsList.isEmpty) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -123,17 +124,33 @@ class _CalenderviewState extends State<Calenderview>{
               ),
               SizedBox(width: 5),
 
-              IconButton(
-                onPressed: (){
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context)=> AlarmList()),
+              ValueListenableBuilder<int>(
+                valueListenable: alarmCountNotifier,
+                builder: (context, count, _) {
+                  return badges.Badge(
+                    badgeStyle: badges.BadgeStyle(
+                      badgeColor: Colors.redAccent
+                    ),
+                    position: badges.BadgePosition.topEnd(
+                      top: 5,
+                      end: -2,
+                    ),
+                    showBadge: count > 0,
+                    badgeContent: Text(
+                      count > 99 ? '99+' : count.toString(),
+                      style: const TextStyle(color: Colors.white, fontSize: 8),
+                    ),
+                    child: IconButton(
+                      icon: Icon(Icons.notifications,size: 25,color: POINT_COLOR,),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const AlarmList()),
+                        );
+                      },
+                    ),
                   );
                 },
-                icon: Icon(Icons.notifications,
-                  size: 25,
-                  color: POINT_COLOR,
-                ),
               ),
             ],
           ),
@@ -152,7 +169,7 @@ class _CalenderviewState extends State<Calenderview>{
                 unselectedLabelColor: Colors.grey,  //선택되지 않은 탭의 글 색상
                 indicatorColor: PRIMARY_COLOR, //선택된 탭 아래 막대 색상
                 indicatorWeight: 2.5, //선택된 탭 아래 막대의 높이
-                indicatorSize: TabBarIndicatorSize.label, //선택된 탭 아래 막대의 너비: 해당 탭의 글자의 너비에 맞게
+                indicatorSize: TabBarIndicatorSize.label, //선택된 탭 아래 막대의 너비
               ),
             ),
           ),
@@ -177,12 +194,11 @@ class _CalenderviewState extends State<Calenderview>{
             child:FloatingActionButton(
               backgroundColor: PRIMARY_COLOR,
               onPressed: () async{
-                // 목표 설정에서 반환되는 값은 Event객체로 newGoal에 저장됨
                 final newGoal = await showModalBottomSheet<Event>(
                   context: context,
                   isScrollControlled: true,
                   backgroundColor: Colors.white,
-                  builder: (context) => ScheduleBottomSheet(), // 기존 바텀시트 위젯
+                  builder: (context) => ScheduleBottomSheet(),
                 );
 
                 if(newGoal != null){
@@ -190,7 +206,7 @@ class _CalenderviewState extends State<Calenderview>{
                   await _loadEvents();
                 }
               },
-              shape: const CircleBorder(),  //둥근 모양
+              shape: const CircleBorder(),
               child: const Icon(
                 Icons.add,
                 color: Colors.white,
@@ -207,15 +223,14 @@ class _CalenderviewState extends State<Calenderview>{
       //달력과 목표/계획의 리스트를 세로로 배치
       child: Stack(
         children: [
-          //'main_calender.dart'의 MainCalendar 위젯 배치
           MainCalendar(
-            onDaySelected: (selectedDay, focusedDay) {  //날짜 선택 시 실행할 함수
-              setState(() {                             //상태 변경을 알리고 rebuild
+            onDaySelected: (selectedDay, focusedDay) {
+              setState(() {
                 selectedDate = selectedDay;
               });
             },
-            selectedDate: selectedDate,                 //선택된 날짜
-            events: map,                          //각 탭에 해당되는 목표 데이터
+            selectedDate: selectedDate,
+            events: map,
           ),
 
           //Prints 위젯 배치
@@ -223,10 +238,10 @@ class _CalenderviewState extends State<Calenderview>{
             child: DraggableScrollableSheet(
               initialChildSize: 0.1,  //화면의 초기 크기
               minChildSize: 0.1,      //최소 크기
-              maxChildSize: 0.9,        //최대 크기
+              maxChildSize: 0.9,      //최대 크기
               builder: (context,scrollController)=>Prints(
-                selectedDate: selectedDate,           //선택된 날짜
-                eventsMap: map,                 //날짜 별로 이벤트를 저장한 저장소
+                selectedDate: selectedDate,
+                eventsMap: map,
                 scrollController: scrollController,
 
                 onPlanUpdated: (Event event) async {
@@ -236,9 +251,13 @@ class _CalenderviewState extends State<Calenderview>{
                   // 뱃지 & 레벨업 로직
                   if (context.mounted && event.id != null) {
 
-                    // 꾸준이 & 성실이 체크
-                    await BadgeService().checkSteadyBadge(context, event.id!);
+                    // 공유 목표인지 확인
+                    bool isShared = event.togeter.isNotEmpty;
 
+                    // 꾸준이
+                    await BadgeService().checkSteadyBadge(context, event.id!, !isShared);
+
+                    // 성실이
                     int total = event.plans.length;
                     int done = event.plans.where((p) => p.isDone).length;
 
@@ -247,8 +266,7 @@ class _CalenderviewState extends State<Calenderview>{
                       await BadgeService().checkSincereBadge(context, rate);
                     }
 
-                    bool isShared = event.togeter.isNotEmpty;
-
+                    // 경험치 지급
                     // 사진 인증 여부
                     bool hasPhoto = false;
 
@@ -275,40 +293,33 @@ class _CalenderviewState extends State<Calenderview>{
 
                   // 세부 계획(Plan) 삭제
                   else if (removePlan && plan != null) {
-
                     if (plan.id != null) {
-                      // 공유 목표인지 확인 (togeter 리스트가 있으면 공유 목표)
                       bool isShared = event.togeter.isNotEmpty;
-
                       await _calendarService.deletePlan(plan.id!, isShared: isShared);
                     }
-
                     event.plans.remove(plan);
-
                   }
-                  // 세부 계획(Plan) 추가 시도
-                  else if (plan != null) {
 
-                    // 날짜 비교 로직 추가
+                  // 세부 계획(Plan) 추가
+                  else if (plan != null) {
                     final now = DateTime.now();
                     final today = DateTime(now.year, now.month, now.day);
 
-                    // 목표의 종료일(endDate)과 오늘을 비교
-                    // endDate가 오늘보다 이전이면(과거라면) 추가 금지
+                    // 목표 종료일 체크
                     if (event.endDate.isBefore(today)) {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text("기간이 종료된 목표에는 계획을 추가할 수 없습니다."),
                             duration: Duration(seconds: 1),
-                            backgroundColor: Colors.redAccent, // 경고 느낌을 위해 빨간색 추천
+                            backgroundColor: Colors.redAccent,
                           ),
                         );
                       }
-                      return; // 여기서 함수 강제 종료
+                      return;
                     }
 
-                    // 기간이 지나지 않았다면 정상적으로 추가 진행
+                    // 기간 문제 없으면 추가
                     event.plans.add(plan);
                     await _calendarService.updateGoal(event);
                   }
